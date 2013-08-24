@@ -1,0 +1,14 @@
+{
+    "name": "sprinkler",
+    "description": "an app for the beaglebone sprinkler shield",
+    "version": "0.0.1",
+    "private": false,
+    "dependencies": {
+        "express": "3.x",
+        "moment-timezone"
+    },
+    "engines": {
+        "node": "0.8.16",
+        "npm": "1.1.49"
+    }
+}

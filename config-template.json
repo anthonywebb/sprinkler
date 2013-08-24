@@ -1,0 +1,40 @@
+{
+    "webserver": {
+        "host": "127.0.0.1",
+        "port": 8080
+    },
+    "zones": [
+        {"name":"Zone 1","pin":"P9_11"},
+        {"name":"Zone 2","pin":"P9_13"},
+        {"name":"Zone 3","pin":"P9_15"},
+        {"name":"Zone 4","pin":"P9_17"},
+        {"name":"Zone 5","pin":"P9_21"},
+        {"name":"Zone 6","pin":"P9_23"},
+        {"name":"Zone 7","pin":"P9_25"},
+        {"name":"Zone 8","pin":"P9_27"},
+        {"name":"Zone 9","pin":"P9_28"},
+        {"name":"Zone 10","pin":"P9_26"},
+        {"name":"Zone 11","pin":"P9_24"},
+        {"name":"Zone 12","pin":"P9_22"},
+        {"name":"Zone 13","pin":"P9_18"},
+        {"name":"Zone 14","pin":"P9_16"},
+        {"name":"Zone 15","pin":"P9_14"},
+        {"name":"Zone 16","pin":"P9_12"}
+    ],
+    "zipcode": "83406",
+    "timezone": "America/Boise",
+    "rain": "P9_29",
+    "button": "P9_30",
+    "programs": [
+        {
+            "active":true,
+            "name":"Program 1",
+            "start":"01:41",
+            "days":[0,1,2,3,4,5,6],
+            "zones":[
+                {"zone":1,"seconds":15},
+                {"zone":3,"seconds":10}
+            ]
+        }
+    ]
+}
