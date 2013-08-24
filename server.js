@@ -2,6 +2,7 @@ var fs = require('fs');
 var dgram = require('dgram');
 var express = require('express');
 var moment = require('moment-timezone');
+var b = require('bonescript');
 
 ///////////////////////////////////////
 // LOAD THE DEFAULT CONFIG
@@ -22,6 +23,21 @@ var running = {};
 var runqueue = [];
 var zonecount = config.zones.length;
 var programcount = config.zones.length;
+var currOn = 0;
+
+// declare the pin modes
+b.pinMode(rain, b.INPUT);
+b.pinMode(button, b.INPUT);
+for(var i = 0; i < config.zones.length; i++){
+    b.pinMode(config.zones[i].pin, b.OUTPUT); 
+}
+
+// attach interrupts
+b.attachInterrupt(rain, true, b.FALLING, rainCallback);
+b.attachInterrupt(button, true, b.FALLING, buttonCallback);
+
+// turn off all zones
+zonesOff(true);
 
 ///////////////////////////////////////
 // CONFFIGURE THE WEBSERVER
@@ -117,12 +133,11 @@ socket.bind();
 socket.setBroadcast(true);
 
 setInterval(function(){
-    socket.send(message, 0, message.length, 41234, '255.255.255.255', function(err, bytes) {
+    socket.send(message, 0, message.length, 41234, '255.255.255.255', function(err, bytes) {
         if(err){
             console.log(err);
         }
     });
-            
 },6000);
 
 
@@ -166,6 +181,10 @@ function zonesOff(killqueue) {
     console.log('shutting off all zones');
     running = {};
 
+    for(var i = 0; i < config.zones.length; i++){
+        pinToggle(config.zones[i].pin,false);
+    }
+
     if(killqueue){
         console.log('clearing the queue');
         runqueue = [];
@@ -181,6 +200,8 @@ function processQueue() {
         running = runqueue.shift();
         running.remaining = running.seconds;
         console.log('Starting zone '+running.zone+' for '+running.seconds+' seconds');
+
+        pinToggle(config.zones[running.zone-1].pin,true);
         
         if(running.seconds > 0) {
             // clear any timers that are currently running
@@ -212,5 +233,37 @@ function processQueue() {
         // once there is nothing left to process we can clear the timers
         clearTimers();
 
+    }
+}
+
+function rainCallback(x) {
+    if(x.output){
+        console.log('Raining!');
+        console.log(JSON.stringify(x));  
+    }
+}
+
+function buttonCallback(x) {
+    if(x.output){
+        currOn += 1;
+        if (currOn<=config.zones.length){
+            console.log('Turning on zone '+currOn);
+            zoneOn(currOn-1,0);
+        }
+        else {
+            console.log('All done, back to the start');
+            currOn = 0;
+        }
+
+        console.log('Button Pressed!');
+        console.log(JSON.stringify(x));   
+    }
+}
+
+function pinToggle(pin,on) {
+    if(on){
+        b.digitalWrite(ping, b.HIGH);
+    } else {
+        b.digitalWrite(ping, b.LOW);
     }
 }
