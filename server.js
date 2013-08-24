@@ -21,7 +21,7 @@ var t, i;
 var running = {};
 var runqueue = [];
 var zonecount = config.zones.length;
-var programcount = config.zones.length;
+var programcount = config.programs.length;
 
 ///////////////////////////////////////
 // CONFFIGURE THE WEBSERVER
@@ -68,7 +68,7 @@ app.get('/off', function(req, res){
 
 app.get('/zone/:id/on/:seconds', function(req, res){
     var zoneindex = req.params.id-1;
-    if(zoneindex>=0 && zoneindex<zonecount-1){
+    if(zoneindex>=0 && zoneindex<zonecount){
         zoneOn(zoneindex,req.params.seconds);
         res.json({status:'ok',msg:'started zone: '+config.zones[zoneindex].name});    
     }
@@ -79,7 +79,7 @@ app.get('/zone/:id/on/:seconds', function(req, res){
 
 app.get('/program/:id/on', function(req, res){
     var programindex = req.params.id-1;
-    if(programindex>=0 && programindex<programcount-1){
+    if(programindex>=0 && programindex<programcount){
         programOn(programindex);
         res.json({status:'ok',msg:'started program: '+config.programs[programindex].name});    
     }
@@ -135,7 +135,7 @@ function missingHandler(req, res, next) {
 }
 
 function errorHandler(res, msg) {
-    console.log(err);
+    console.log(msg);
     res.json(500, { status: 'error', msg: msg });
 }
 
