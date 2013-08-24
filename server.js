@@ -248,7 +248,7 @@ function buttonCallback(x) {
         currOn += 1;
         if (currOn<=config.zones.length){
             console.log('Turning on zone '+currOn);
-            zoneOn(currOn-1,0);
+            zoneOn(currOn-1,900);
         }
         else {
             console.log('All done, back to the start');
