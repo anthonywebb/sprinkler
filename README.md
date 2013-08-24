@@ -4,7 +4,7 @@ A node.js application to enable a BeagleBone to become a smart sprinkler control
 
 ## Installation
 
-1. To install simple copy config-template.json to a new file called config.json
+1. Copy `config-template.json` to a new file called: `config.json`
 2. Install depedencies: `npm install`
 3. To run, simply type: `node server.js`
 
@@ -22,7 +22,7 @@ This project acts as an API to our forthcoming mobile app.  If you want to play 
 
 ## History
 
-This app is Pre-ALPHA, is no where complete, and should not be used yet.  There is virtually no data validation and it isnt too hard to entirely crash it.  We'll get there though, hang tight.
+This app is PRE-ALPHA, is no where complete, and should not be used yet.  There is virtually no data validation and it isnt too hard to entirely crash it.  We'll get there though, hang tight.
 
 ## Credits
 
