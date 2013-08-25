@@ -89,6 +89,18 @@ app.get('/off', function(req, res){
     res.json({status:'ok',msg:'all zones have been turned off'});
 });
 
+app.get('/zone/:id/history', function(req, res){
+    // Finding all the history for this zone
+    db.find({ zone: parseInt(req.params.id) }, function (err, docs) {
+        if(err){
+            console.log(err);
+            res.json({status: 'error', msg:err.message});
+        } else {
+            res.json({status: 'ok', history:docs});    
+        }
+    });
+});
+
 app.get('/zone/:id/on/:seconds', function(req, res){
     if(req.params.id>=0 && req.params.id<zonecount){
         zoneOn(req.params.id,req.params.seconds);
