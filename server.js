@@ -26,15 +26,15 @@ var programcount = config.programs.length;
 var currOn = 0;
 
 // declare the pin modes
-b.pinMode(rain, b.INPUT);
-b.pinMode(button, b.INPUT);
+b.pinMode(config.rain, b.INPUT);
+b.pinMode(config.button, b.INPUT);
 for(var i = 0; i < config.zones.length; i++){
     b.pinMode(config.zones[i].pin, b.OUTPUT); 
 }
 
 // attach interrupts
-b.attachInterrupt(rain, true, b.FALLING, rainCallback);
-b.attachInterrupt(button, true, b.FALLING, buttonCallback);
+b.attachInterrupt(config.rain, true, b.FALLING, rainCallback);
+b.attachInterrupt(config.button, true, b.FALLING, buttonCallback);
 
 // turn off all zones
 zonesOff(true);
