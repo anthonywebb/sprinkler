@@ -2,6 +2,7 @@ var fs = require('fs');
 var dgram = require('dgram');
 var express = require('express');
 var moment = require('moment-timezone');
+var nedb = require('nedb'); 
 
 ///////////////////////////////////////
 // LOAD THE DEFAULT CONFIG
@@ -16,12 +17,34 @@ catch (err) {
     console.log(err);
 } 
 
+// load up the database
+var db = new nedb({ filename: './database', autoload: true });
+
 // Some of our default vars
 var t, i;
 var running = {};
 var runqueue = [];
 var zonecount = config.zones.length;
 var programcount = config.programs.length;
+var currOn = 0;
+
+///////////////////////////////////////
+// BBB specific setup
+//////////////////////////////////////
+if(config.production){
+    var b = require('bonescript');
+
+    // declare the pin modes
+    b.pinMode(config.rain, b.INPUT);
+    b.pinMode(config.button, b.INPUT);
+    for(var i = 0; i < config.zones.length; i++){
+        b.pinMode(config.zones[i].pin, b.OUTPUT); 
+    }
+
+    // attach interrupts
+    b.attachInterrupt(config.rain, true, b.FALLING, rainCallback);
+    b.attachInterrupt(config.button, true, b.FALLING, buttonCallback);    
+}
 
 ///////////////////////////////////////
 // CONFFIGURE THE WEBSERVER
@@ -67,10 +90,9 @@ app.get('/off', function(req, res){
 });
 
 app.get('/zone/:id/on/:seconds', function(req, res){
-    var zoneindex = req.params.id-1;
-    if(zoneindex>=0 && zoneindex<zonecount){
-        zoneOn(zoneindex,req.params.seconds);
-        res.json({status:'ok',msg:'started zone: '+config.zones[zoneindex].name});    
+    if(req.params.id>=0 && req.params.id<zonecount){
+        zoneOn(req.params.id,req.params.seconds);
+        res.json({status:'ok',msg:'started zone: '+config.zones[req.params.id].name});    
     }
     else {
         errorHandler(res,'That is not a valid zone')
@@ -78,10 +100,9 @@ app.get('/zone/:id/on/:seconds', function(req, res){
 });
 
 app.get('/program/:id/on', function(req, res){
-    var programindex = req.params.id-1;
-    if(programindex>=0 && programindex<programcount){
-        programOn(programindex);
-        res.json({status:'ok',msg:'started program: '+config.programs[programindex].name});    
+    if(req.params.id>=0 && req.params.id<programcount){
+        programOn(req.params.id);
+        res.json({status:'ok',msg:'started program: '+config.programs[req.params.id].name});    
     }
     else {
         errorHandler(res,'That is not a valid program');
@@ -93,6 +114,9 @@ app.get('/program/:id/on', function(req, res){
 //////////////////////////////////////
 app.listen(config.webserver.port);
 console.log('Listening on port '+config.webserver.port);
+
+// turn off all zones
+zonesOff(true);
 
 // Add the listener for recurring program schedules
 setInterval(function(){
@@ -109,7 +133,6 @@ setInterval(function(){
     
 },60000) 
 
-
 // Start auto discovery UDP broadcast ping
 var message = new Buffer("Some bytes");
 var socket = dgram.createSocket("udp4");
@@ -117,12 +140,11 @@ socket.bind();
 socket.setBroadcast(true);
 
 setInterval(function(){
-    socket.send(message, 0, message.length, 41234, '255.255.255.255', function(err, bytes) {
+    socket.send(message, 0, message.length, 41234, '255.255.255.255', function(err, bytes) {
         if(err){
             console.log(err);
         }
     });
-            
 },6000);
 
 
@@ -151,7 +173,7 @@ function resetCounts() {
 
 function zoneOn(index,seconds) {
     zonesOff(true);
-    runqueue.push({zone:index+1,seconds:seconds});
+    runqueue.push({zone:index,seconds:seconds});
     processQueue();
 }
 
@@ -164,7 +186,29 @@ function programOn(index) {
 function zonesOff(killqueue) {
     // shut down all the zones
     console.log('shutting off all zones');
+    
+    // if we are currently running something
+    if(running.seconds){
+        if(running.remaining == 1) running.remaining = 0;
+        var runtime = running.seconds-running.remaining;
+        // dont log stuff that wasnt running for at least a minute
+        if (runtime > 5) {
+            console.log('writing to the database...');
+            var data = {seconds: running.seconds, runtime: runtime, zone:running.zone, timestamp: new Date()};
+            db.insert(data, function (err, newDoc) {
+                if(err){
+                    console.log(err);
+                }
+                console.log('wrote record '+newDoc._id);
+            });    
+        }        
+    }
+
     running = {};
+
+    for(var i = 0; i < config.zones.length; i++){
+        pinToggle(config.zones[i].pin,false);
+    }
 
     if(killqueue){
         console.log('clearing the queue');
@@ -180,7 +224,9 @@ function processQueue() {
         // start working on the next item in the queue
         running = runqueue.shift();
         running.remaining = running.seconds;
-        console.log('Starting zone '+running.zone+' for '+running.seconds+' seconds');
+        console.log('Starting zone with an index of '+running.zone+' for '+running.seconds+' seconds');
+
+        pinToggle(config.zones[running.zone].pin,true);
         
         if(running.seconds > 0) {
             // clear any timers that are currently running
@@ -189,7 +235,7 @@ function processQueue() {
             // count down the time remaining
             i = setInterval(function(){
                 if(running.zone){
-                    running.remaining = running.remaining-1;
+                    running.remaining = running.remaining - 1;
                 }
                 
             },1000) 
@@ -212,5 +258,39 @@ function processQueue() {
         // once there is nothing left to process we can clear the timers
         clearTimers();
 
+    }
+}
+
+function rainCallback(x) {
+    if(x.output){
+        console.log('Raining!');
+        console.log(JSON.stringify(x));  
+    }
+}
+
+function buttonCallback(x) {
+    if(x.output){
+        currOn += 1;
+        if (currOn<=config.zones.length){
+            console.log('Turning on zone '+currOn);
+            zoneOn(currOn-1,900);
+        }
+        else {
+            console.log('All done, back to the start');
+            currOn = 0;
+        }
+
+        console.log('Button Pressed!');
+        console.log(JSON.stringify(x));   
+    }
+}
+
+function pinToggle(pin,on) {
+    if(config.production){
+        if(on){
+            b.digitalWrite(ping, b.HIGH);
+        } else {
+            b.digitalWrite(ping, b.LOW);
+        }
     }
 }

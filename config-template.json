@@ -25,6 +25,7 @@
     "timezone": "America/Boise",
     "rain": "P9_29",
     "button": "P9_30",
+    "production": false,
     "programs": [
         {
             "active":true,
