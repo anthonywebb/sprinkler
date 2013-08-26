@@ -158,7 +158,7 @@ setInterval(function(){
 },60000) 
 
 // Start auto discovery UDP broadcast ping
-var message = new Buffer("Some bytes");
+var message = new Buffer("sprinkler");
 var socket = dgram.createSocket("udp4");
 socket.bind();
 socket.setBroadcast(true);
@@ -216,7 +216,7 @@ function zonesOff(killqueue) {
         if(running.remaining == 1) running.remaining = 0;
         var runtime = running.seconds-running.remaining;
         // dont log stuff that wasnt running for at least a minute
-        if (runtime > 5) {
+        if (runtime > 60) {
             console.log('writing to the database...');
             var data = {seconds: running.seconds, runtime: runtime, zone:running.zone, timestamp: new Date()};
             db.insert(data, function (err, newDoc) {
