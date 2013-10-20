@@ -13,6 +13,7 @@ A node.js application to enable a BeagleBone to become a smart sprinkler control
 This project acts as an API to our forthcoming mobile app.  If you want to play around with it without the app you may load the postman collection (postman.js) into the postman chrome extension (https://chrome.google.com/webstore/detail/postman-rest-client/fdmmgilgnpjigdojojpjoooidkmcomcm) and browse the methods that are exposed in the API.
 
 Watering programs can also be defined using Google calendars:
+
 1. The Google calendars must be public. Your watering schedule will be for the world to see! Do not store personal information in that calendar.
 2. The events location (see item `Where` in the event details) must match the item `location` in `config.json` (this is a new item in the configuration!). The location is used to support multiple watering controllers in the same calendar.
 3. The events description must be a space-separated (or comma-separated) list of zone entries.
