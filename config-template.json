@@ -21,6 +21,7 @@
         {"name":"Zone 15","pin":"P9_14"},
         {"name":"Zone 16","pin":"P9_12"}
     ],
+    "location": "home",
     "zipcode": "83406",
     "timezone": "America/Boise",
     "rain": "P9_29",

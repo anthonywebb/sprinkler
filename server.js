@@ -4,6 +4,8 @@ var express = require('express');
 var moment = require('moment-timezone');
 var nedb = require('nedb'); 
 
+var calendar = require('./calendar');
+
 ///////////////////////////////////////
 // LOAD THE DEFAULT CONFIG
 //////////////////////////////////////
@@ -11,6 +13,7 @@ var config = fs.readFileSync('./config.json');
 try {
     config = JSON.parse(config);
     //console.log(config);
+    calendar.configure(config);
 }
 catch (err) {
     console.log('There has been an error parsing your config')
@@ -27,6 +30,7 @@ var runqueue = [];
 var zonecount = config.zones.length;
 var programcount = config.programs.length;
 var currOn = 0;
+var lastScheduleCheck = null;
 
 ///////////////////////////////////////
 // BBB specific setup
@@ -47,7 +51,7 @@ if(config.production){
 }
 
 ///////////////////////////////////////
-// CONFFIGURE THE WEBSERVER
+// CONFIGURE THE WEBSERVER
 //////////////////////////////////////
 var app = express();
 app.use(express.favicon());
@@ -73,6 +77,7 @@ app.post('/config', function(req, res){
         }
         console.log('Configuration saved successfully.');
         config = req.body;
+        calendar.configure(config);
         zonecount = config.zones.length;
         programcount = config.zones.length;
     });
@@ -125,7 +130,7 @@ app.get('/zone/:id/on/:seconds', function(req, res){
 
 app.get('/program/:id/on', function(req, res){
     if(req.params.id>=0 && req.params.id<programcount){
-        programOn(req.params.id);
+        programOn(config.programs[req.params.id]);
         res.json({status:'ok',msg:'started program: '+config.programs[req.params.id].name});    
     }
     else {
@@ -142,20 +147,38 @@ console.log('Listening on port '+config.webserver.port);
 // turn off all zones
 zonesOff(true);
 
+// Go through the list of programs to search one to activate.
+function schedulePrograms (programs, currTime, currDay) {
+    for(var i=0;i<programs.length;i++){
+        if(programs[i].active && currTime == programs[i].start &&  programs[i].days.indexOf(currDay) != -1){
+            programOn(programs[i]);
+        }
+    }
+}
+
 // Add the listener for recurring program schedules
+//
+// The calendar programs are kept separate from the programs in config,
+// so that they are not saved to config.json as a side effect.
+// Another solution would be to build a list of programs to execute, separate
+// from the config object, that would be an union of config and calendar.
+//
+// (Shannon's sampling theorem: sample every 30s to detect a 1mn period
+// event reliably, i.e. never miss a minute. However this will cause
+// the server to check the same minute twice: the solution is to remember
+// the last time processed.)
 setInterval(function(){
     var d = moment().tz(config.timezone);
     var currTime = d.format('HH:mm');
     var currDay = parseInt(d.format('d'));
 
-    // loop over the programs and see if we have a match
-    for(var i=0;i<config.programs.length;i++){
-        if(config.programs[i].active && currTime == config.programs[i].start &&  config.programs[i].days.indexOf(currDay) != -1){
-            programOn(i);
-        }
-    }
-    
-},60000) 
+    if (currTime == lastScheduleCheck) return;
+    lastScheduleCheck = currTime;
+
+    schedulePrograms (config.programs, currTime, currDay);
+    schedulePrograms (calendar.programs(), currTime, currDay);
+
+},30000) 
 
 // Start auto discovery UDP broadcast ping
 var message = new Buffer("sprinkler");
@@ -201,9 +224,11 @@ function zoneOn(index,seconds) {
     processQueue();
 }
 
-function programOn(index) {
+function programOn(program) {
     zonesOff(true);
-    runqueue = config.programs[index].zones;
+    var d = moment().tz(config.timezone);
+    console.log('Starting program '+program.name+' at '+d.format('HH:mm'));
+    runqueue = program.zones;
     processQueue();
 }
 
@@ -248,7 +273,8 @@ function processQueue() {
         // start working on the next item in the queue
         running = runqueue.shift();
         running.remaining = running.seconds;
-        console.log('Starting zone with an index of '+running.zone+' for '+running.seconds+' seconds');
+        var d = moment().tz(config.timezone);
+        console.log('Starting zone with an index of '+running.zone+' for '+running.seconds+' seconds at '+d.format('HH:mm'));
 
         pinToggle(config.zones[running.zone].pin,true);
         
@@ -267,7 +293,8 @@ function processQueue() {
             // start a countdown timer for the zone watering time
             t = setTimeout(function(){
                 // turn off the zones, pass false so it wont kill the rest of the items in the queue
-                console.log('Done with zone '+running.zone+' for '+running.seconds+' seconds');
+                var d = moment().tz(config.timezone);
+                console.log('Done with zone '+running.zone+' for '+running.seconds+' seconds at '+d.format('HH:mm'));
                 zonesOff(false);
 
                 // wait a couple seconds and kick off the next
@@ -282,6 +309,8 @@ function processQueue() {
         // once there is nothing left to process we can clear the timers
         clearTimers();
 
+        var d = moment().tz(config.timezone);
+        console.log('Program complete at '+d.format('HH:mm'));
     }
 }
 
