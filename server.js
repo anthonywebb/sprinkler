@@ -9,6 +9,23 @@ var calendar = require('./calendar');
 ///////////////////////////////////////
 // LOAD THE DEFAULT CONFIG
 //////////////////////////////////////
+
+// Count the number of items (protected against the worst possible case).
+function resetCounts() {
+    if (config.zones != null) {
+        zonecount = config.zones.length;
+    }
+    else {
+        zonecount = 0;
+    }
+    if (config.programs != null) {
+        programcount = config.programs.length;
+    }
+    else {
+        programcount = 0;
+    }
+}
+
 var config = fs.readFileSync('./config.json');
 try {
     config = JSON.parse(config);
@@ -27,10 +44,13 @@ var db = new nedb({ filename: './database', autoload: true });
 var t, i;
 var running = {};
 var runqueue = [];
-var zonecount = config.zones.length;
-var programcount = config.programs.length;
 var currOn = 0;
 var lastScheduleCheck = null;
+var zonecount = 0;
+var programcount = 0;
+
+// Calculate the real counts from the configuration we loaded.
+resetCounts();
 
 ///////////////////////////////////////
 // BBB specific setup
@@ -41,7 +61,7 @@ if(config.production){
     // declare the pin modes
     b.pinMode(config.rain, b.INPUT);
     b.pinMode(config.button, b.INPUT);
-    for(var i = 0; i < config.zones.length; i++){
+    for(var i = 0; i < zonecount; i++){
         b.pinMode(config.zones[i].pin, b.OUTPUT); 
     }
 
@@ -78,8 +98,7 @@ app.post('/config', function(req, res){
         console.log('Configuration saved successfully.');
         config = req.body;
         calendar.configure(config);
-        zonecount = config.zones.length;
-        programcount = config.zones.length;
+        resetCounts();
     });
 
     res.json({status:'ok',msg:'config saved'});
@@ -149,6 +168,7 @@ zonesOff(true);
 
 // Go through the list of programs to search one to activate.
 function schedulePrograms (programs, currTime, currDay) {
+    if (programs == null) return;
     for(var i=0;i<programs.length;i++){
         if(programs[i].active && currTime == programs[i].start &&  programs[i].days.indexOf(currDay) != -1){
             programOn(programs[i]);
@@ -213,11 +233,6 @@ function clearTimers() {
     clearTimeout(t);
 }
 
-function resetCounts() {
-    zonecount = config.zones.length;
-    programcount = config.zones.length;
-}
-
 function zoneOn(index,seconds) {
     zonesOff(true);
     runqueue.push({zone:index,seconds:seconds});
@@ -255,7 +270,7 @@ function zonesOff(killqueue) {
 
     running = {};
 
-    for(var i = 0; i < config.zones.length; i++){
+    for(var i = 0; i < zonecount; i++){
         pinToggle(config.zones[i].pin,false);
     }
 
@@ -273,7 +288,13 @@ function processQueue() {
         // start working on the next item in the queue
         running = runqueue.shift();
         running.remaining = running.seconds;
+
         var d = moment().tz(config.timezone);
+        if ((running.zone < 0) || (running.zone >= zonecount)) {
+            // Don't process an invalid program.
+            console.log('Invalid zone '+running.zone);
+            return;
+        }
         console.log('Starting zone with an index of '+running.zone+' for '+running.seconds+' seconds at '+d.format('HH:mm'));
 
         pinToggle(config.zones[running.zone].pin,true);
@@ -324,7 +345,7 @@ function rainCallback(x) {
 function buttonCallback(x) {
     if(x.output){
         currOn += 1;
-        if (currOn<=config.zones.length){
+        if (currOn<=zonecount){
             console.log('Turning on zone '+currOn);
             zoneOn(currOn-1,900);
         }

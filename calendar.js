@@ -28,6 +28,11 @@ exports.configure = function (config) {
    imported.pending = null;
    imported.calendar = new Array();
 
+   if (config.calendars == null) {
+      imported.programs = new Array();
+      return;
+   }
+
    for (var i = 0; i < config.calendars.length; i++) {
 
       switch (config.calendars[i].format) {
@@ -66,6 +71,7 @@ exports.configure = function (config) {
 var zoneIndex;
 function buildZoneIndex(config) {
    zoneIndex = new Array();
+   if (config.zones == null) return;
    for (var i = 0; i < config.zones.length; i++) {
       zoneIndex[config.zones[i].name] = i;
    }
