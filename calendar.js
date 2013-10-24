@@ -1,5 +1,58 @@
-// This is a calendar module for SprinklerServer.
 // Copyrigth (C) Pascal Martin, 2013.
+//
+// NAME
+//
+//   calendar - a module to read watering programs from Google calendar
+//
+// SYNOPSYS
+//
+//   This module implements an interface to Google calendar and
+//   converts calendar events into watering programs. The description
+//   of each calendar event must match a defined syntax to be valid.
+//
+//   This module can read more than one calendar.
+//
+//   This module queries the Google servers not more often than every
+//   12 hours, unless the configuration has been changed. The update is
+//   asynchronous.
+//
+// DESCRIPTION
+//
+//   var calendar = require('./calendar');
+//
+//   calendar.configure (config);
+//
+//      Initialize the calendar module from the user configuration.
+//      This method can be called as often as necessary (typically
+//      when the configuration has changed).
+//
+//   calendar.refresh ();
+//
+//      Query the calendar servers for updates. A refresh is executed
+//      only if the last one was performed more than a defined interval
+//      (12 hours) ago, or if the configuration was changed.
+//
+//   calendar.programs ();
+//
+//      Return the list of watering programs built from the last refresh.
+//
+// CONFIGURATION
+//
+//   location              The name of the location used for this sprinkler
+//                         controller. An event will be loaded only if it's
+//                         location matches the controller's location.
+//
+//   calendars             The calendar module configuration array.
+//
+//   calendars[n].format   Format of calendar data received. This module
+//                         only support format "iCalendar" for now.
+//
+//   calendars[n].name     Base name for this calendar. The name is combined
+//                         with the name of each event to generate a unique
+//                         watering program name.
+//
+//   calendars[n].source   The address of the calendar server. This is
+//                         typically an URL.
 
 var http = require('http');
 var https = require('https');
@@ -13,6 +66,9 @@ var imported = new Object();
 imported.calendar = new Array();
 imported.programs = new Array();
 imported.received = null;
+
+var lastUpdate = 0
+var updateInterval = 12 * 3600000; // 12 hours in milliseconds.
 
 // --------------------------------------------------------------------------
 // Build the calendar source DB from the sprinkler's configuration.
@@ -60,6 +116,8 @@ exports.configure = function (config) {
    }
    imported.location = config.location;
 
+   // Force access to the calendar on configuration change.
+   lastUpdate = new Date().getTime();
    loadNextCalendar();
 }
 
@@ -441,7 +499,16 @@ function loadNextCalendar () {
    // console.log("Import complete: " + JSON.stringify(imported));
 }
 
-exports.refresh = loadNextCalendar;
+exports.refresh = function () {
+
+   var time = new Date().getTime();
+
+   // Throttle when to request for information, to limit traffic.
+   if (time < lastUpdate + updateInterval) return;
+   lastUpdate = time;
+
+   loadNextCalendar;
+}
 
 exports.programs = function () {
    var active_programs = new Array();
