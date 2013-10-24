@@ -5,6 +5,7 @@ var moment = require('moment-timezone');
 var nedb = require('nedb'); 
 
 var calendar = require('./calendar');
+var weather = require('./weather');
 
 ///////////////////////////////////////
 // LOAD THE DEFAULT CONFIG
@@ -31,6 +32,7 @@ try {
     config = JSON.parse(config);
     //console.log(config);
     calendar.configure(config);
+    weather.configure(config);
 }
 catch (err) {
     console.log('There has been an error parsing your config')
@@ -98,6 +100,7 @@ app.post('/config', function(req, res){
         console.log('Configuration saved successfully.');
         config = req.body;
         calendar.configure(config);
+        weather.configure(config);
         resetCounts();
     });
 
@@ -198,7 +201,12 @@ setInterval(function(){
     schedulePrograms (config.programs, currTime, currDay);
     schedulePrograms (calendar.programs(), currTime, currDay);
 
-},30000) 
+},30000);
+
+setInterval(function(){
+    calendar.refresh();
+    weather.refresh();
+},600000);
 
 // Start auto discovery UDP broadcast ping
 var message = new Buffer("sprinkler");
@@ -258,7 +266,7 @@ function zonesOff(killqueue) {
         // dont log stuff that wasnt running for at least a minute
         if (runtime > 60) {
             console.log('writing to the database...');
-            var data = {seconds: running.seconds, runtime: runtime, zone:running.zone, timestamp: new Date()};
+            var data = {seconds: running.seconds, runtime: runtime, zone:running.zone, timestamp: new Date(), temperature: weather.temperature(), humidity: weather.humidity(), adjustment: weather.adjustment()};
             db.insert(data, function (err, newDoc) {
                 if(err){
                     console.log(err);
@@ -287,6 +295,8 @@ function processQueue() {
     if(runqueue.length){
         // start working on the next item in the queue
         running = runqueue.shift();
+
+        running.seconds = (running.seconds * weather.adjustment()) / 100;
         running.remaining = running.seconds;
 
         var d = moment().tz(config.timezone);
@@ -323,7 +333,7 @@ function processQueue() {
                     processQueue();
                 },2000) 
 
-            },running.seconds*1000)    
+            },running.seconds*1000);
         }
 
     } else {

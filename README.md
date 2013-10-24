@@ -26,6 +26,15 @@ Watering programs can also be defined using Google calendars:
 
 (This calendar feature supports both https and http access. It should work with any web calendar that offers a public web access in the iCalendar format.)
 
+Watering programs can be automatically adjusted using weather information from the Weather Underground servers:
+
+1. The user must register with Weather Underground to get his own key.
+2. The weather module is configured in config.json as the `weather` structure:
+3. The `weather.key` item must be set to the Weather Underground key.
+4. The `weather.adjust.min` item represents the minimum allowed adjustment.
+5. The `weather.adjust.max` item represents the maximum allowed adjustment.
+6. The `weather.raintrigger` item represents the rain level (in inches) that triggers a virtual rain sensor.
+
 ## Contributing
 
 1. Fork it!
