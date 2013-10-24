@@ -216,7 +216,7 @@ exports.adjustment = function () {
    var rain_factor = 0.0 - ((precipi + precip_today_in) * 200.0);
 
    var adjust =
-       Math.min(Math.max(30, 100+humid_factor+temp_factor+rain_factor), 200);
+       Math.min(Math.max(minadjust, 100+humid_factor+temp_factor+rain_factor), maxadjust);
 
    return adjust;
 }
