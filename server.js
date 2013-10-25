@@ -210,9 +210,14 @@ setInterval(function(){
     // behavior more predictable. This is just a (debatable) choice.
 
     var now = new Date().getTime();
+    var rain = 1;
 
-    if ((b.digitalRead(config.rain) == 0) || (weather.rainsensor())) {
-       rainTimer = now + rainDelayInterval;
+    if(config.production){
+       rain = b.digitalRead(config.rain);
+    }
+
+    if ((rain == 0) || (weather.rainsensor())) {
+          rainTimer = now + rainDelayInterval;
     }
     if (rainTimer > now) return;
 
@@ -229,8 +234,11 @@ setInterval(function(){
 // Start auto discovery UDP broadcast ping
 var message = new Buffer("sprinkler");
 var socket = dgram.createSocket("udp4");
-socket.bind();
-socket.setBroadcast(true);
+// TBD: better use callback: socket.bind(config.webserver.port, function() {
+socket.bind(config.webserver.port);
+setTimeout(function(){
+    socket.setBroadcast(true);
+}, 3000);
 
 setInterval(function(){
     socket.send(message, 0, message.length, 41234, '255.255.255.255', function(err, bytes) {
