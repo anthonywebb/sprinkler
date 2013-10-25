@@ -51,6 +51,9 @@ var lastScheduleCheck = null;
 var zonecount = 0;
 var programcount = 0;
 
+var rainDelayInterval = 86340000; // 1 day - 1 minute.
+var rainTimer = 0
+
 // Calculate the real counts from the configuration we loaded.
 resetCounts();
 
@@ -197,6 +200,21 @@ setInterval(function(){
 
     if (currTime == lastScheduleCheck) return;
     lastScheduleCheck = currTime;
+
+    // Rain sensor(s) handling.
+    // In this design, rain detection does not abort an active program
+    // on its track, it only disables launching new programs.
+    // We check the status of the rain sensor(s) even if the rain timer
+    // is armed: this pushes the timer to one day after the end of the rain.
+    // The rationale is that we hope that this will make the controller's
+    // behavior more predictable. This is just a (debatable) choice.
+
+    var now = new Date().getTime();
+
+    if ((b.digitalRead(config.rain) == 0) || (weather.rainsensor())) {
+       rainTimer = now + rainDelayInterval;
+    }
+    if (rainTimer > now) return;
 
     schedulePrograms (config.programs, currTime, currDay);
     schedulePrograms (calendar.programs(), currTime, currDay);
@@ -349,6 +367,7 @@ function rainCallback(x) {
     if(x.output){
         console.log('Raining!');
         console.log(JSON.stringify(x));  
+        rainTimer = new Date().getTime() + rainDelayInterval;
     }
 }
 
