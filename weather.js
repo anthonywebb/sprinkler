@@ -123,6 +123,8 @@ exports.configure = function (config) {
    }
 
    raintrigger = config.weather.raintrigger;
+
+   getWeather();
 }
 
 function decode (text) {
@@ -144,9 +146,7 @@ function decode (text) {
    return false;
 }
 
-exports.refresh = function () {
-
-   if (url == null) return;
+function getWeather () {
 
    var time = new Date().getTime();
 
@@ -154,14 +154,23 @@ exports.refresh = function () {
    if (time < lastUpdate + updateInterval) return;
    lastUpdate = time;
 
+   console.log ('Checking for weather update..');
    http.get(url, function(res) {
       res.on('data', function(d) {
-         decode (d.toString());
+         if (decode (d.toString())) {
+            console.log ('Received weather update');
+         }
       });
    }).on('error', function(e) {
       received = null;
       weatherConditions = null;
    });
+}
+
+exports.refresh = function () {
+
+   if (url == null) return;
+   getWeather();
 }
 
 exports.temperature = function () {
@@ -183,6 +192,7 @@ exports.rain = function () {
 
 exports.rainsensor = function () {
    if (raintrigger == null) return false;
+   if (weatherConditions == null) return false;
    var today_in = weatherConditions.current_observation.precip_today_in - 0;
    return (today_in >= raintrigger);
 }
