@@ -154,11 +154,11 @@ function getWeather () {
    if (time < lastUpdate + updateInterval) return;
    lastUpdate = time;
 
-   console.log ('Checking for weather update..');
+   console.log ('Weather: checking for update..');
    http.get(url, function(res) {
       res.on('data', function(d) {
          if (decode (d.toString())) {
-            console.log ('Received weather update');
+            console.log ('Weather: received update');
          }
       });
    }).on('error', function(e) {
@@ -214,12 +214,12 @@ exports.adjustment = function () {
    var precipi = history.precipi - 0;
    var precip_today_in = current.precip_today_in - 0;
 
-   // console.log ("Current adjustment:");
-   // console.log ("history.maxhumidity = "+history.maxhumidity);
-   // console.log ("history.minhumidity = "+history.minhumidity);
-   // console.log ("history.meantempi = "+history.meantempi);
-   // console.log ("history.precipi = "+history.precipi);
-   // console.log ("current.precip_today_in = "+current.precip_today_in);
+   // console.log ("Weather: current adjustment");
+   // console.log ("Weather: history.maxhumidity = "+history.maxhumidity);
+   // console.log ("Weather: history.minhumidity = "+history.minhumidity);
+   // console.log ("Weather: history.meantempi = "+history.meantempi);
+   // console.log ("Weather: history.precipi = "+history.precipi);
+   // console.log ("Weather: current.precip_today_in = "+current.precip_today_in);
 
    var humid_factor = 30 - ((maxhumidity + minhumidity) / 2);
    var temp_factor = (meantempi - 70) * 4;
