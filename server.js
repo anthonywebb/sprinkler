@@ -33,6 +33,11 @@ try {
     //console.log(config);
     calendar.configure(config);
     weather.configure(config);
+
+    if (config.udp == null) {
+       config.udp = new Object();
+       config.udp.port = config.webserver.port;
+    }
 }
 catch (err) {
     console.error('There has been an error parsing your config')
@@ -43,10 +48,12 @@ catch (err) {
 var db = new nedb({ filename: './database', autoload: true });
 
 // Some of our default vars
-var t, i;
+var zoneTimer = null;
+var zoneInterval = null;
 var running = {};
 var runqueue = [];
 var currOn = 0;
+var buttonTimer = null;
 var lastScheduleCheck = null;
 var zonecount = 0;
 var programcount = 0;
@@ -116,6 +123,18 @@ app.get('/status', function(req, res){
 app.get('/off', function(req, res){
     zonesOff(true);
     res.json({status:'ok',msg:'all zones have been turned off'});
+});
+
+// This URL is to simulate the physical button. For test only.
+app.get('/button', function(req, res){
+    buttonCallback({output: true});
+    if (currOn == 0) {
+        res.json({status:'ok',msg:'No zone turned on'});
+    }
+    else {
+        var zone = currOn - 1;
+        res.json({status:'ok',msg:'Current zone is '+zone});
+    }
 });
 
 app.get('/history', function(req, res){
@@ -231,10 +250,10 @@ setInterval(function(){
 },600000);
 
 // Start auto discovery UDP broadcast ping
-var message = new Buffer("sprinkler");
+var message = new Buffer("sprinkler "+config.webserver.port);
 var socket = dgram.createSocket("udp4");
 // TBD: better use callback: socket.bind(config.webserver.port, function() {
-socket.bind(config.webserver.port);
+socket.bind(config.udp.port);
 setTimeout(function(){
     socket.setBroadcast(true);
 }, 3000);
@@ -281,8 +300,14 @@ function errorHandler(res, msg) {
 }
 
 function clearTimers() {
-    clearInterval(i);
-    clearTimeout(t);
+    if (zoneInterval != null) {
+        clearInterval(zoneInterval);
+        zoneInterval = null;
+    }
+    if (zoneTimer != null) {
+        clearTimeout(zoneTimer);
+        zoneTimer = null;
+    }
 }
 
 function zoneOn(index,seconds) {
@@ -360,7 +385,7 @@ function processQueue() {
             clearTimers();
 
             // count down the time remaining
-            i = setInterval(function(){
+            zoneInterval = setInterval(function(){
                 if(running.zone){
                     running.remaining = running.remaining - 1;
                 }
@@ -368,7 +393,7 @@ function processQueue() {
             },1000) 
 
             // start a countdown timer for the zone watering time
-            t = setTimeout(function(){
+            zoneTimer = setTimeout(function(){
                 // turn off the zones, pass false so it wont kill the rest of the items in the queue
                 zonesOff(false);
 
@@ -398,9 +423,16 @@ function rainCallback(x) {
 function buttonCallback(x) {
     if(x.output){
         currOn += 1;
+        if (buttonTimer != null) {
+           clearTimeout(buttonTimer);
+           buttonTimer = null;
+        }
         if (currOn<=zonecount){
-            console.log('Turning on zone '+currOn);
-            zoneOn(currOn-1,900);
+            buttonTimer = setTimeout (function () {
+                var zone = currOn - 1;
+                console.log('Turning on zone '+zone);
+                zoneOn(zone,900);
+            }, 2000);
         }
         else {
             console.log('All done, back to the start');
