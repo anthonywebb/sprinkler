@@ -47,7 +47,7 @@
 //
 //   weather.rain ();
 //
-//      return the current rain level in inches.
+//      return the total rain level for the last two days in inches.
 //
 //   weather.rainsensor ();
 //
@@ -187,7 +187,9 @@ exports.humidity = function () {
 
 exports.rain = function () {
    if (weatherConditions == null) return null;
-   return weatherConditions.current_observation.precip_today_in - 0;
+   var precipi = weatherConditions.history.dailysummary[0].precipi - 0;
+   var today = weatherConditions.current_observation.precip_today_in - 0;
+   return precipi + today;
 }
 
 exports.rainsensor = function () {

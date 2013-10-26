@@ -293,7 +293,7 @@ function zoneOn(index,seconds) {
 
 function programOn(program) {
     zonesOff(true);
-    logEvent({action: "START", program: program.name, temperature: weather.temperature(), humidity: weather.humidity(), adjustment: weather.adjustment()});
+    logEvent({action: 'START', program: program.name, temperature: weather.temperature(), humidity: weather.humidity(), rain: weather.rain(), adjustment: weather.adjustment()});
 
     runqueue = program.zones;
 
