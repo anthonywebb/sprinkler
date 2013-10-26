@@ -15,7 +15,7 @@ This project acts as an API to our forthcoming mobile app.  If you want to play 
 Watering programs can also be defined using Google calendars:
 
 1. The Google calendars must be public. Your watering schedule will be for the world to see! Do not store personal information in that calendar.
-2. The events location (see item `Where` in the event details) must match the item `location` in `config.json` (this is a new item in the configuration!). The location is used to support multiple watering controllers in the same calendar.
+2. The events location (see item `Where` in the event details) must match the item `location` in `config.json` (this is a new item in the configuration!). The location is used to support multiple watering controllers in the same calendar. If the `location` item is missing, value `home` is used as default.
 3. The events description must be a space-separated (or comma-separated) list of zone entries.
 4. Each zone entry contains the zone name and duration (minutes), separated by an equal sign (or a column). For example: `flowerbed=14`. A zone name cannot contain spaces, sorry.
 5. A calendar used for watering schedule must only contain watering schedule events. Create separate calendars for your watering schedules.

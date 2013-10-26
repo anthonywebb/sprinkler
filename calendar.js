@@ -41,6 +41,7 @@
 //   location              The name of the location used for this sprinkler
 //                         controller. An event will be loaded only if it's
 //                         location matches the controller's location.
+//                         (Default: 'home'.)
 //
 //   calendars             The calendar module configuration array.
 //
@@ -77,7 +78,7 @@ var updateInterval = 12 * 3600000; // 12 hours in milliseconds.
 //
 exports.configure = function (config) {
 
-   console.log ("Analyzing calendar sources in configuration");
+   console.log ("Calendar: analyzing calendar sources in configuration");
 
    buildZoneIndex(config);
 
@@ -98,15 +99,12 @@ exports.configure = function (config) {
          break;
 
       case "XML":
-         console.error (config.calendars[i].name +
-                        ": XML format is not supported yet");
+         console.error ('Calendar: XML format is not supported yet (in '+config.calendars[i].name+')');
          imported.calendar[i] = new UnsupportedCalendar("XML");
          break;
 
       default:
-         console.error (config.calendars[i].name +
-                        ": calendar format '" +
-                        config.calendars[i].format + "' is not supported");
+         console.error ('Calendar: format '+config.calendars[i].format+' is not supported (in '+config.calendars[i].name+')');
          imported.calendar[i] =
             new UnsupportedCalendar(config.calendars[i].format);
          break;
@@ -115,6 +113,9 @@ exports.configure = function (config) {
       imported.calendar[i].source = config.calendars[i].source;
    }
    imported.location = config.location;
+   if (imported.location == null) {
+      imported.location = 'home'
+   }
 
    // Force access to the calendar on configuration change.
    lastUpdate = new Date().getTime();
@@ -156,7 +157,7 @@ function decodeEventsFromICalendar (text) {
          switch (operands[1]) {
          case 'VEVENT':
             if (inVevent) {
-              console.error("BEGIN VEVENT inside EVENT at line " + i + ": " + text);
+              console.error("Calendar: BEGIN VEVENT inside EVENT at line " + i + ": " + text);
             }
             event = new Object();
             event.repeat = false;
@@ -292,7 +293,7 @@ function iCalendarToProgram (calendar_name, event) {
       // Set the time of day, interval and day filter.
       switch (event.rrule.freq) {
       case 'DAILY':
-         console.log(program.name + ': DAILY mode is not yet supported');
+         console.log('Calendar: '+program.name + ': DAILY mode is not yet supported');
          return null;
       case 'WEEKLY':
          var days = event.rrule.byday.split(',');
@@ -302,7 +303,7 @@ function iCalendarToProgram (calendar_name, event) {
             if (thisDay >= 0) {
                program.days[program.days.length] = thisDay;
             } else {
-               console.log( days[k] + ' is not a valid iCalendar day of the week');
+               console.log('Calendar: '+days[k]+' is not a valid iCalendar day of the week');
             }
          }
          program.zones = descriptionToZones (event.description);
@@ -333,12 +334,12 @@ function ICalendar () {
 ICalendar.prototype.import = function (text) {
 
    if (imported.received != null) {
-      //console.log("Received additional iCalendar data:\n" + text + "\n");
+      //console.log("Calendar: received additional iCalendar data:\n" + text + "\n");
       text = imported.received + text;
    }
 
    if (text.search(/END:VCALENDAR/) < 0) {
-      //console.log("Received incomplete iCalendar data:\n" + text + "\n");
+      //console.log("Calendar: received incomplete iCalendar data:\n" + text + "\n");
       imported.received = text;
       return false; // Waiting for the end of the calendar data.
    }
@@ -356,11 +357,14 @@ ICalendar.prototype.import = function (text) {
       }
    }
 
+   var count = 0;
    for (var i = 0; i < events.length; i++) {
 
       // Ignore all-day events and events for other controllers
       if (!events[i].hasStart) continue;
       if (events[i].location != imported.location) continue;
+
+      count += 1;
 
       var program = iCalendarToProgram (pending.name, events[i]);
       if (program != null) {
@@ -377,6 +381,7 @@ ICalendar.prototype.import = function (text) {
          }
       }
    }
+   console.log ('Calendar: loaded '+count+' programs from '+pending.name);
 
    // Some programs may remain from deleted events: clean them up.
 
@@ -418,7 +423,7 @@ function cancelCalendarLoad (e) {
 
    imported.received = null; // Forget all data in transit.
    imported.calendar[imported.pending].status = 'failed';
-   console.error(imported.calendar[imported.pending].name + ': ' + e.message);
+   console.error('Calendar: '+imported.calendar[imported.pending].name + ': ' + e.message);
    imported.pending = null;
 }
 
@@ -448,7 +453,7 @@ function loadNextCalendar () {
 
       var pending = imported.calendar[i];
 
-      console.log("Importing calendar: " + pending.name);
+      console.log("Calendar: importing calendar " + pending.name);
       imported.pending = i;
       pending.status = 'pending';
 
@@ -488,15 +493,14 @@ function loadNextCalendar () {
 
       // The calendar source URL does not match any supported protocol.
 
-      console.error (pending.name +
-                     ": unsupported protocol in '" + pending.source + "'");
+      console.error ('Calendar: unsupported protocol for '+pending.name +" in '"+ pending.source + "'");
       pending.status = 'error';
    }
 
    // We are done processing all calendars.
    imported.pending = null;
    cleanObsoleteCalendars();
-   // console.log("Import complete: " + JSON.stringify(imported));
+   // console.log("Calendar: import complete: " + JSON.stringify(imported));
 }
 
 exports.refresh = function () {

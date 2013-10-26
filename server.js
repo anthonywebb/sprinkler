@@ -35,8 +35,8 @@ try {
     weather.configure(config);
 }
 catch (err) {
-    console.log('There has been an error parsing your config')
-    console.log(err);
+    console.error('There has been an error parsing your config')
+    console.error(err);
 } 
 
 // load up the database
@@ -50,6 +50,9 @@ var currOn = 0;
 var lastScheduleCheck = null;
 var zonecount = 0;
 var programcount = 0;
+
+var rainDelayInterval = 86340000; // 1 day - 1 minute.
+var rainTimer = 0
 
 // Calculate the real counts from the configuration we loaded.
 resetCounts();
@@ -87,14 +90,13 @@ app.get('/config', function(req, res){
 });
 
 app.post('/config', function(req, res){
-    console.log(req.body);
+    //console.log(req.body);
 
     var data = JSON.stringify(req.body);
 
     fs.writeFile('./config.json', data, function (err) {
         if (err) {
-            console.log('There has been an error saving your configuration data.');
-            console.log(err.message);
+            console.error('failed to save configuration data: '+err.message);
             return;
         }
         console.log('Configuration saved successfully.');
@@ -120,10 +122,10 @@ app.get('/history', function(req, res){
     // Finding all the history for this zone
     db.find({}, function (err, docs) {
         if(err){
-            console.log(err);
+            console.error(err);
             res.json({status: 'error', msg:err.message});
         } else {
-            res.json({status: 'ok', history:docs});    
+            reportHistory(res, docs);
         }
     });
 });
@@ -132,10 +134,10 @@ app.get('/zone/:id/history', function(req, res){
     // Finding all the history for this zone
     db.find({ zone: parseInt(req.params.id) }, function (err, docs) {
         if(err){
-            console.log(err);
+            console.error(err);
             res.json({status: 'error', msg:err.message});
         } else {
-            res.json({status: 'ok', history:docs});    
+            reportHistory(res, docs);
         }
     });
 });
@@ -198,6 +200,26 @@ setInterval(function(){
     if (currTime == lastScheduleCheck) return;
     lastScheduleCheck = currTime;
 
+    // Rain sensor(s) handling.
+    // In this design, rain detection does not abort an active program
+    // on its track, it only disables launching new programs.
+    // We check the status of the rain sensor(s) even if the rain timer
+    // is armed: this pushes the timer to one day after the end of the rain.
+    // The rationale is that we hope that this will make the controller's
+    // behavior more predictable. This is just a (debatable) choice.
+
+    var now = new Date().getTime();
+    var rain = 1;
+
+    if(config.production){
+       rain = b.digitalRead(config.rain);
+    }
+
+    if ((rain == 0) || (weather.rainsensor())) {
+          rainTimer = now + rainDelayInterval;
+    }
+    if (rainTimer > now) return;
+
     schedulePrograms (config.programs, currTime, currDay);
     schedulePrograms (calendar.programs(), currTime, currDay);
 
@@ -211,13 +233,16 @@ setInterval(function(){
 // Start auto discovery UDP broadcast ping
 var message = new Buffer("sprinkler");
 var socket = dgram.createSocket("udp4");
-socket.bind();
-socket.setBroadcast(true);
+// TBD: better use callback: socket.bind(config.webserver.port, function() {
+socket.bind(config.webserver.port);
+setTimeout(function(){
+    socket.setBroadcast(true);
+}, 3000);
 
 setInterval(function(){
     socket.send(message, 0, message.length, 41234, '255.255.255.255', function(err, bytes) {
         if(err){
-            console.log(err);
+            console.error(err);
         }
     });
 },6000);
@@ -226,6 +251,25 @@ setInterval(function(){
 ///////////////////////////////////////
 // HELPERS
 //////////////////////////////////////
+
+function reportHistory (res, docs) {
+   // The history is sorted most recent first.
+   docs.sort(function (a, b) {
+       return b.timestamp - a.timestamp;
+   });
+   res.json({status: 'ok', history:docs});    
+}
+
+function logEvent (data) {
+    data.timestamp = new Date();
+    db.insert(data, function (err, newDoc) {
+        if(err){
+            console.error('Database insert error: '+err);
+        }
+        //console.log('wrote record '+newDoc._id);
+    });    
+}
+
 function missingHandler(req, res, next) {
     console.log('404 Not found - '+req.url);
     res.json(404, { status: 'error', msg: 'Not found, sorry...' });
@@ -243,37 +287,41 @@ function clearTimers() {
 
 function zoneOn(index,seconds) {
     zonesOff(true);
-    runqueue.push({zone:index,seconds:seconds});
+    runqueue.push({zone:index,seconds:seconds,parent:null});
     processQueue();
 }
 
 function programOn(program) {
     zonesOff(true);
-    var d = moment().tz(config.timezone);
-    console.log('Starting program '+program.name+' at '+d.format('HH:mm'));
+    logEvent({action: 'START', program: program.name, temperature: weather.temperature(), humidity: weather.humidity(), rain: weather.rain(), adjustment: weather.adjustment()});
+
     runqueue = program.zones;
+
+    // Adjust the program's zones duration according to the weather.
+    // Note that we do not adjust a manual activation on an individual
+    // zone: the user knows what he is doing.
+
+    for (var i = 0; i < runqueue.length; i++) {
+         runqueue[i].parent = program.name;
+         runqueue[i].seconds =
+             (runqueue[i].seconds * weather.adjustment()) / 100;
+    }
     processQueue();
 }
 
 function zonesOff(killqueue) {
     // shut down all the zones
-    console.log('shutting off all zones');
+    // console.log('shutting off all zones');
     
     // if we are currently running something
     if(running.seconds){
         if(running.remaining == 1) running.remaining = 0;
         var runtime = running.seconds-running.remaining;
-        // dont log stuff that wasnt running for at least a minute
-        if (runtime > 60) {
-            console.log('writing to the database...');
-            var data = {seconds: running.seconds, runtime: runtime, zone:running.zone, timestamp: new Date(), temperature: weather.temperature(), humidity: weather.humidity(), adjustment: weather.adjustment()};
-            db.insert(data, function (err, newDoc) {
-                if(err){
-                    console.log(err);
-                }
-                console.log('wrote record '+newDoc._id);
-            });    
-        }        
+        var action = 'END';
+        if (killqueue) {
+            action = 'CANCEL';
+        }
+        logEvent({action: action, zone: running.zone-0, parent: running.parent, seconds: running.seconds, runtime: runtime});
     }
 
     running = {};
@@ -283,7 +331,7 @@ function zonesOff(killqueue) {
     }
 
     if(killqueue){
-        console.log('clearing the queue');
+        //console.log('clearing the queue');
         runqueue = [];
         // kill any outstanding timers
         clearTimers();
@@ -296,16 +344,14 @@ function processQueue() {
         // start working on the next item in the queue
         running = runqueue.shift();
 
-        running.seconds = (running.seconds * weather.adjustment()) / 100;
-        running.remaining = running.seconds;
-
-        var d = moment().tz(config.timezone);
         if ((running.zone < 0) || (running.zone >= zonecount)) {
             // Don't process an invalid program.
-            console.log('Invalid zone '+running.zone);
+            console.error('Invalid zone '+running.zone);
             return;
         }
-        console.log('Starting zone with an index of '+running.zone+' for '+running.seconds+' seconds at '+d.format('HH:mm'));
+        logEvent({action: 'START', zone:running.zone-0, parent: running.parent, seconds: running.seconds});
+
+        running.remaining = running.seconds;
 
         pinToggle(config.zones[running.zone].pin,true);
         
@@ -324,8 +370,6 @@ function processQueue() {
             // start a countdown timer for the zone watering time
             t = setTimeout(function(){
                 // turn off the zones, pass false so it wont kill the rest of the items in the queue
-                var d = moment().tz(config.timezone);
-                console.log('Done with zone '+running.zone+' for '+running.seconds+' seconds at '+d.format('HH:mm'));
                 zonesOff(false);
 
                 // wait a couple seconds and kick off the next
@@ -339,9 +383,7 @@ function processQueue() {
     } else {
         // once there is nothing left to process we can clear the timers
         clearTimers();
-
-        var d = moment().tz(config.timezone);
-        console.log('Program complete at '+d.format('HH:mm'));
+        logEvent({action: 'IDLE'});
     }
 }
 
@@ -349,6 +391,7 @@ function rainCallback(x) {
     if(x.output){
         console.log('Raining!');
         console.log(JSON.stringify(x));  
+        rainTimer = new Date().getTime() + rainDelayInterval;
     }
 }
 

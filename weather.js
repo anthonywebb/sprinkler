@@ -47,7 +47,7 @@
 //
 //   weather.rain ();
 //
-//      return the current rain level in inches.
+//      return the total rain level for the last two days in inches.
 //
 //   weather.rainsensor ();
 //
@@ -123,6 +123,8 @@ exports.configure = function (config) {
    }
 
    raintrigger = config.weather.raintrigger;
+
+   getWeather();
 }
 
 function decode (text) {
@@ -144,9 +146,7 @@ function decode (text) {
    return false;
 }
 
-exports.refresh = function () {
-
-   if (url == null) return;
+function getWeather () {
 
    var time = new Date().getTime();
 
@@ -154,14 +154,23 @@ exports.refresh = function () {
    if (time < lastUpdate + updateInterval) return;
    lastUpdate = time;
 
+   console.log ('Weather: checking for update..');
    http.get(url, function(res) {
       res.on('data', function(d) {
-         decode (d.toString());
+         if (decode (d.toString())) {
+            console.log ('Weather: received update');
+         }
       });
    }).on('error', function(e) {
       received = null;
       weatherConditions = null;
    });
+}
+
+exports.refresh = function () {
+
+   if (url == null) return;
+   getWeather();
 }
 
 exports.temperature = function () {
@@ -178,11 +187,14 @@ exports.humidity = function () {
 
 exports.rain = function () {
    if (weatherConditions == null) return null;
-   return weatherConditions.current_observation.precip_today_in - 0;
+   var precipi = weatherConditions.history.dailysummary[0].precipi - 0;
+   var today = weatherConditions.current_observation.precip_today_in - 0;
+   return precipi + today;
 }
 
 exports.rainsensor = function () {
    if (raintrigger == null) return false;
+   if (weatherConditions == null) return false;
    var today_in = weatherConditions.current_observation.precip_today_in - 0;
    return (today_in >= raintrigger);
 }
@@ -204,12 +216,12 @@ exports.adjustment = function () {
    var precipi = history.precipi - 0;
    var precip_today_in = current.precip_today_in - 0;
 
-   // console.log ("Current adjustment:");
-   // console.log ("history.maxhumidity = "+history.maxhumidity);
-   // console.log ("history.minhumidity = "+history.minhumidity);
-   // console.log ("history.meantempi = "+history.meantempi);
-   // console.log ("history.precipi = "+history.precipi);
-   // console.log ("current.precip_today_in = "+current.precip_today_in);
+   // console.log ("Weather: current adjustment");
+   // console.log ("Weather: history.maxhumidity = "+history.maxhumidity);
+   // console.log ("Weather: history.minhumidity = "+history.minhumidity);
+   // console.log ("Weather: history.meantempi = "+history.meantempi);
+   // console.log ("Weather: history.precipi = "+history.precipi);
+   // console.log ("Weather: current.precip_today_in = "+current.precip_today_in);
 
    var humid_factor = 30 - ((maxhumidity + minhumidity) / 2);
    var temp_factor = (meantempi - 70) * 4;
