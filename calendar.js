@@ -55,6 +55,7 @@
 //   calendars[n].source   The address of the calendar server. This is
 //                         typically an URL.
 
+var fs = require('fs');
 var http = require('http');
 var https = require('https');
 
@@ -70,6 +71,8 @@ imported.received = null;
 
 var lastUpdate = 0
 var updateInterval = 12 * 3600000; // 12 hours in milliseconds.
+
+var webRequest = null;
 
 // --------------------------------------------------------------------------
 // Build the calendar source DB from the sprinkler's configuration.
@@ -114,7 +117,7 @@ exports.configure = function (config) {
    }
    imported.location = config.location;
    if (imported.location == null) {
-      imported.location = 'home'
+      imported.location = 'home';
    }
 
    // Force access to the calendar on configuration change.
@@ -350,6 +353,8 @@ ICalendar.prototype.import = function (text) {
 
    // Disable all existing programs for that calendar, now that
    // the new calendar events are available.
+   // This makes it possible to detect events that disappeared
+   // (see function pruneObsoletePrograms).
 
    for (var i = 0; i < imported.programs.length; i++) {
       if (imported.programs[i].parent == pending.name) {
@@ -381,45 +386,51 @@ ICalendar.prototype.import = function (text) {
          }
       }
    }
+
    console.log ('Calendar: loaded '+count+' programs from '+pending.name);
-
-   // Some programs may remain from deleted events: clean them up.
-
-   for (var i = 0; i < imported.programs.length; i++) {
-      if (imported.programs[i].parent == pending.name) {
-         if (! imported.programs[i].active) {
-            imported.programs[i] = new Object();
-            imported.programs[i].active = false;
-         }
-      }
-   }
    pending.status = 'ok';
+   pending = null;
+   events = null;
+   text = null;
+   imported.pending = null;
+
    return true;
 }
 
 // --------------------------------------------------------------------------
-// Remove calendars that are no longer listed in the DB.
+// Remove unused or obsolete programs
+// There are two cases:
+// - program's parent is no longer present.
+// - program was de-activated before decoding the parent's data and was not
+//   reactivated because we did not find it anymore.
 //
-function cleanObsoleteCalendars() {
+function pruneObsoletePrograms() {
 
    var present = new Array();
+   var programs = new Array();
 
    for (var i = 0; i < imported.calendar.length; i++) {
       present[imported.calendar[i].name] = 1;
    }
 
    for (var i = 0; i < imported.programs.length; i++) {
-      if (present[imported.programs[i].parent] == null) {
-         imported.programs[i] = new Object();
-         imported.programs[i].active = false;
-      }
+
+      if (imported.programs[i].active == null) continue;
+      if (present[imported.programs[i].parent] == null) continue;
+
+      programs[programs.length] = imported.programs[i];
    }
+   imported.programs = programs;
+   present = null;
+   programs = null;
 }
 
 // --------------------------------------------------------------------------
 // Cancel the load of a calendar due to network error.
 //
 function cancelCalendarLoad (e) {
+
+   if (imported.pending == null) return;
 
    imported.received = null; // Forget all data in transit.
    imported.calendar[imported.pending].status = 'failed';
@@ -446,37 +457,57 @@ function cancelCalendarLoad (e) {
 //
 function loadNextCalendar () {
 
+   if (imported.pending != null) {
+      console.log ('Calendar: too early, calendar #'+imported.pending+' is pending');
+      return;
+   }
+
    for (var i = 0; i < imported.calendar.length; i++) {
 
       if (imported.calendar[i].status == 'pending') return; // Too early.
       if (imported.calendar[i].status != 'idle') continue;
 
-      var pending = imported.calendar[i];
-
-      console.log("Calendar: importing calendar " + pending.name);
+      console.log("Calendar: importing calendar " + imported.calendar[i].name);
       imported.pending = i;
-      pending.status = 'pending';
+      imported.calendar[i].status = 'pending';
 
-      if (pending.source.match ("https://.*")) {
+      if (imported.calendar[i].source.match ("file:.*")) {
 
-         https.get(pending.source, function(res) {
-            res.on('data', function(d) {
-               if (imported.pending == null) return;
-               if (imported.calendar[imported.pending].import(d.toString())) {
-                  loadNextCalendar();
-               }
-            });
-   
-         }).on('error', function(e) {
-            cancelCalendarLoad (e);
-            loadNextCalendar();
-         });
+         console.log ('Calendar: accessing file '+imported.calendar[i].source.slice(5));
+
+         var data = null;
+
+         try {
+            data = fs.readFileSync(imported.calendar[i].source.slice(5));
+         }
+         catch(err) {
+            console.error ('Calendar: file '+imported.calendar[i].source.slice(5)+' not found');
+         }
+         if (data != null) {
+            if (! imported.calendar[imported.pending].import(data.toString())) {
+               console.error ('Calendar: invalid data in file '+imported.calendar[i].source.slice(5));
+            }
+            data = null;
+         }
+         loadNextCalendar();
          return;
       }
 
-      if (pending.source.match ("http://.*")) {
+      var proto = null;
 
-         http.get(pending.source, function(res) {
+      if (imported.calendar[i].source.match ("https://.*")) {
+         proto = https;
+      }
+      else if (imported.calendar[i].source.match ("http://.*")) {
+         proto = http;
+      }
+
+      if (proto != null) {
+
+         console.log ('Calendar: accessing '+imported.calendar[i].source);
+
+         var data = null;
+         webRequest = proto.request(imported.calendar[i].source, function(res) {
             res.on('data', function(d) {
                if (imported.pending == null) return;
                if (imported.calendar[imported.pending].import(d.toString())) {
@@ -484,23 +515,28 @@ function loadNextCalendar () {
                }
             });
    
-         }).on('error', function(e) {
+         });
+         webRequest.on('error', function(e) {
             cancelCalendarLoad (e);
             loadNextCalendar();
          });
+         webRequest.end();
+         proto = null;
          return;
       }
 
       // The calendar source URL does not match any supported protocol.
 
-      console.error ('Calendar: unsupported protocol for '+pending.name +" in '"+ pending.source + "'");
-      pending.status = 'error';
+      console.error ('Calendar: unsupported protocol for '+imported.calendar[i].name +" in '"+ imported.calendar[i].source + "'");
+      imported.calendar[i].status = 'error';
+      imported.received = null;
    }
 
    // We are done processing all calendars.
+   webRequest = null;
    imported.pending = null;
-   cleanObsoleteCalendars();
-   // console.log("Calendar: import complete: " + JSON.stringify(imported));
+   pruneObsoletePrograms();
+   console.log("Calendar: import complete");
 }
 
 exports.refresh = function () {
