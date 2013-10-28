@@ -91,6 +91,7 @@ var url = null;
 var minadjust = 30;
 var maxadjust = 150;
 var raintrigger = null;
+var webRequest = null;
 
 function restoreDefaults () {
 
@@ -155,16 +156,19 @@ function getWeather () {
    lastUpdate = time;
 
    console.log ('Weather: checking for update..');
-   http.get(url, function(res) {
+   webRequest = http.request(url, function(res) {
       res.on('data', function(d) {
          if (decode (d.toString())) {
             console.log ('Weather: received update');
          }
       });
-   }).on('error', function(e) {
+   });
+   webRequest.on('error', function(e) {
       received = null;
       weatherConditions = null;
    });
+   webRequest.end();
+   webRequest = null;
 }
 
 exports.refresh = function () {
