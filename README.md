@@ -22,9 +22,9 @@ Watering programs can also be defined using Google calendars:
 6. Each calendar must be described in config.json, array `calendars`
 7. Each entry in the array must include an item `name` (must be unique).
 8. Each entry in the array must include an item `format`, set to `iCalendar`.
-9. Each entry in the array must include an item `source`, set to the `ICAL` address of the calendar (see calendar details).
+9. Each entry in the array must include an item `source`, set to the `ICAL` address of the calendar (see calendar details). You can also load a calendar from a file (must be in the iCalendar format) using a `file:` URL (for example: `file:mycalendar.ics`).
 
-(This calendar feature supports both https and http access. It should work with any web calendar that offers a public web access in the iCalendar format.)
+(This calendar feature supports both https and http web access. It should work with any web calendar that supports public download in the iCalendar format.)
 
 Watering programs can be automatically adjusted using weather information from the Weather Underground servers:
 
