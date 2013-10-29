@@ -6,7 +6,8 @@
     "dependencies": {
         "express": "3.x",
         "moment-timezone": "latest",
-        "nedb": "latest"
+        "nedb": "latest",
+        "graceful-fs": "latest"
     },
     "engines": {
         "node": "0.8.16",

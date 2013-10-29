@@ -1,4 +1,4 @@
-var fs = require('fs');
+var fs = require('graceful-fs');
 var dgram = require('dgram');
 var express = require('express');
 var moment = require('moment-timezone');
