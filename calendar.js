@@ -55,7 +55,7 @@
 //   calendars[n].source   The address of the calendar server. This is
 //                         typically an URL.
 
-var fs = require('fs');
+var fs = require('graceful-fs');
 var http = require('http');
 var https = require('https');
 
