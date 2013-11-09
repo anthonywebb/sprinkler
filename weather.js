@@ -128,25 +128,6 @@ exports.configure = function (config) {
    getWeather();
 }
 
-function decode (text) {
-
-   if (received != null) {
-      text = received + text;
-   }
-
-   var braces = text.split('{').length;
-
-   if ((braces > 0) && (braces == text.split('}').length)) {
-      weatherConditions = JSON.parse(text);
-      received = null;
-      return true;
-   }
-
-   received = text; // Wait for more.
-
-   return false;
-}
-
 function getWeather () {
 
    var time = new Date().getTime();
@@ -156,11 +137,16 @@ function getWeather () {
    lastUpdate = time;
 
    console.log ('Weather: checking for update..');
+   received = "";
+
    webRequest = http.request(url, function(res) {
       res.on('data', function(d) {
-         if (decode (d.toString())) {
-            console.log ('Weather: received update');
-         }
+         received = received + d.toString();
+      });
+      res.on('end', function(d) {
+         weatherConditions = JSON.parse(received);
+         received = null;
+         console.log ('Weather: received update');
       });
    });
    webRequest.on('error', function(e) {
