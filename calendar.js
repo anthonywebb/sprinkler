@@ -333,22 +333,7 @@ function ICalendar () {
 // --------------------------------------------------------------------------
 // Import iCalendar events from one calendar into sprinkler programs.
 //
-// We may receive the data in multiple chunks. We must accumulate all data
-// received until the end of the iCalendar data before we start decoding.
-//
 ICalendar.prototype.import = function (text) {
-
-   if (imported.received != null) {
-      //console.log("Calendar: received additional iCalendar data:\n" + text + "\n");
-      text = imported.received + text;
-   }
-
-   if (text.search(/END:VCALENDAR/) < 0) {
-      //console.log("Calendar: received incomplete iCalendar data:\n" + text + "\n");
-      imported.received = text;
-      return false; // Waiting for the end of the calendar data.
-   }
-   imported.received = null; // We do not need this buffer anymore.
 
    var events = decodeEventsFromICalendar(text);
 
@@ -393,8 +378,6 @@ ICalendar.prototype.import = function (text) {
    pendingCalendar = null;
    events = null;
    text = null;
-
-   return true;
 }
 
 // --------------------------------------------------------------------------
@@ -442,12 +425,18 @@ function cancelCalendarLoad (e) {
 // Access a web calendar.
 function loadWebCalendar (proto) {
 
+     imported.received = "";
+
      webRequest = proto.request(pendingCalendar.source, function(res) {
         res.on('data', function(d) {
            if (pendingCalendar == null) return;
-           if (pendingCalendar.import(d.toString())) {
-              loadNextCalendar(); // recursive. Are we confusing the GC?
-           }
+           imported.received = imported.received + d.toString();
+        });
+        res.on('end', function(d) {
+           if (pendingCalendar == null) return;
+           pendingCalendar.import(imported.received);
+           imported.received = null; // We do not need this buffer anymore.
+           loadNextCalendar(); // recursive. Are we confusing the GC?
         });
    
      });
@@ -472,9 +461,7 @@ function loadFileCalendar () {
        console.error ('Calendar: file '+imported.calendar[i].source.slice(5)+' not found');
     }
     if (data != null) {
-       if (! pendingCalendar.import(data.toString())) {
-          console.error ('Calendar: invalid data in file '+pendingCalendar.source.slice(5));
-       }
+       pendingCalendar.import(data.toString());
        data = null;
     }
 }
@@ -547,7 +534,7 @@ function loadNextCalendar () {
 
 
 // --------------------------------------------------------------------------
-// Method for periodic calndar refresh.
+// Method for periodic calendar refresh.
 exports.refresh = function () {
 
    var time = new Date().getTime();
