@@ -24,8 +24,17 @@
     "location": "home",
     "zipcode": "83406",
     "timezone": "America/Boise",
-    "rain": "P9_29",
-    "button": "P9_30",
+    "beagle16": {
+        "rain": "P9_29",
+        "button": "P9_30"
+    },
+    "osbo": {
+        "data": "P9_11",
+        "clock": "P9_13",
+        "enable": "P9_14",
+        "latch": "P9_15",
+        "rain": "P9_15"
+    },
     "production": false,
     "programs": [
         {
