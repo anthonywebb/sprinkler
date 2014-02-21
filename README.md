@@ -2,11 +2,14 @@
 
 A node.js application to enable a BeagleBone to become a smart sprinkler controller via our forthcoming cape which you can get a sneak peek at here: https://plus.google.com/112693340411141805940/posts/JqfbhicXUrv
 
+This software also includes early support for the OpenSprinkler OSBo board.
+
 ## Installation
 
 1. Copy `config-template.json` to a new file called: `config.json`
-2. Install depedencies: `npm install`
-3. To run, simply type: `node server.js`
+2. Create `hardware.js` as a symbolic link to `hardware-beagle16.js`
+3. Install dependencies: `npm install`
+4. To run, simply type: `node server.js`
 
 ## Usage
 

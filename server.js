@@ -6,6 +6,7 @@ var nedb = require('nedb');
 
 var calendar = require('./calendar');
 var weather = require('./weather');
+var hardware = require('./hardware');
 
 ///////////////////////////////////////
 // LOAD THE DEFAULT CONFIG
@@ -64,23 +65,9 @@ var rainTimer = 0
 // Calculate the real counts from the configuration we loaded.
 resetCounts();
 
-///////////////////////////////////////
-// BBB specific setup
-//////////////////////////////////////
-if(config.production){
-    var b = require('bonescript');
-
-    // declare the pin modes
-    b.pinMode(config.rain, b.INPUT);
-    b.pinMode(config.button, b.INPUT);
-    for(var i = 0; i < zonecount; i++){
-        b.pinMode(config.zones[i].pin, b.OUTPUT); 
-    }
-
-    // attach interrupts
-    b.attachInterrupt(config.rain, true, b.FALLING, rainCallback);
-    b.attachInterrupt(config.button, true, b.FALLING, buttonCallback);    
-}
+hardware.configure (config);
+hardware.rainInterrupt (rainCallback);
+hardware.buttonInterrupt (buttonCallback);
 
 ///////////////////////////////////////
 // CONFIGURE THE WEBSERVER
@@ -110,6 +97,9 @@ app.post('/config', function(req, res){
         config = req.body;
         calendar.configure(config);
         weather.configure(config);
+        hardware.configure (config);
+        hardware.rainInterrupt (rainCallback);
+        hardware.buttonInterrupt (buttonCallback);
         resetCounts();
     });
 
@@ -228,13 +218,8 @@ setInterval(function(){
     // behavior more predictable. This is just a (debatable) choice.
 
     var now = new Date().getTime();
-    var rain = 1;
 
-    if(config.production){
-       rain = b.digitalRead(config.rain);
-    }
-
-    if ((rain == 0) || (weather.rainsensor())) {
+    if (hardware.rainSensor() || weather.rainsensor()) {
           rainTimer = now + rainDelayInterval;
     }
     if (rainTimer > now) return;
@@ -352,8 +337,9 @@ function zonesOff(killqueue) {
     running = {};
 
     for(var i = 0; i < zonecount; i++){
-        pinToggle(config.zones[i].pin,false);
+        hardware.setZone (i, false);
     }
+    hardware.apply();
 
     if(killqueue){
         //console.log('clearing the queue');
@@ -378,8 +364,8 @@ function processQueue() {
 
         running.remaining = running.seconds;
 
-        pinToggle(config.zones[running.zone].pin,true);
-        
+        hardware.setZone (running.zone, true);
+
         if(running.seconds > 0) {
             // clear any timers that are currently running
             clearTimers();
@@ -410,6 +396,7 @@ function processQueue() {
         clearTimers();
         logEvent({action: 'IDLE'});
     }
+    hardware.apply();
 }
 
 function rainCallback(x) {
@@ -444,12 +431,3 @@ function buttonCallback(x) {
     }
 }
 
-function pinToggle(pin,on) {
-    if(config.production){
-        if(on){
-            b.digitalWrite(ping, b.HIGH);
-        } else {
-            b.digitalWrite(ping, b.LOW);
-        }
-    }
-}
