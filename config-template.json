@@ -24,6 +24,7 @@
     "location": "home",
     "zipcode": "83406",
     "timezone": "America/Boise",
+    "raindelay": true,
     "beagle16": {
         "rain": "P9_29",
         "button": "P9_30"

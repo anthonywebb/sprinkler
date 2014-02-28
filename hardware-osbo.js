@@ -47,7 +47,7 @@
 //
 //      Push the current zone controls to the outside world.
 //
-//   hardware.rainsensor ();
+//   hardware.rainSensor ();
 //
 //      Return true or false, true if rain is detected. Always return
 //      false if there is no rain sensor.
@@ -98,7 +98,7 @@ catch (err) {
 var piodb = new Object(); // Make sure it exists (simplify validation).
 
 exports.configure = function (config) {
-   if ((io == null) || (! config.production)) {
+   if ((! io) || (! config.production)) {
       debuglog ('using debug I/O module');
       io = require('./iodebug');
    }
@@ -113,24 +113,24 @@ exports.configure = function (config) {
    piodb.pins.rain = "P9_15";
    piodb.pins.edge = io.FALLING;
 
-   if (config.osbo != null) {
+   if (config.osbo) {
       // We need to go item by item so to not overwrite defaults.
-      if (config.osbo.data != null) {
+      if (config.osbo.data) {
          piodb.pins.data = config.osbo.data;
       }
-      if (config.osbo.clock != null) {
+      if (config.osbo.clock) {
          piodb.pins.clock = config.osbo.clock;
       }
-      if (config.osbo.enable != null) {
+      if (config.osbo.enable) {
          piodb.pins.enable = config.osbo.enable;
       }
-      if (config.osbo.latch != null) {
+      if (config.osbo.latch) {
          piodb.pins.latch = config.osbo.latch;
       }
-      if (config.osbo.rain != null) {
+      if (config.osbo.rain) {
          piodb.pins.rain = config.osbo.rain;
       }
-      if (config.osbo.edge != null) {
+      if (config.osbo.edge) {
          piodb.pins.edge = config.osbo.edge;
       }
    }
@@ -152,10 +152,10 @@ exports.configure = function (config) {
 }
 
 exports.rainSensor = function () {
-   if (piodb.pins == null) {
+   if (! piodb.pins) {
       return false;
    }
-   if (piodb.pins.rain == null) {
+   if (! piodb.pins.rain) {
       return false;
    }
    if (io.digitalRead(piodb.pins.rain) > 0) {
@@ -170,10 +170,10 @@ exports.button = function () {
 }
 
 exports.rainInterrupt = function (callback) {
-   if (piodb.pins == null) {
+   if (! piodb.pins) {
       return false;
    }
-   if (piodb.pins.rain == null) {
+   if (! piodb.pins.rain) {
       return null;
    }
    io.attachInterrupt(piodb.pins.rain, true, piodb.pins.edge, callback);
@@ -185,7 +185,7 @@ exports.buttonInterrupt = function (callback) {
 }
 
 exports.setZone = function (zone, on) {
-   if (piodb.zones == null) {
+   if (! piodb.zones) {
       return null;
    }
    if (on) {
@@ -201,7 +201,7 @@ exports.setZone = function (zone, on) {
 }
 
 exports.apply = function () {
-   if (piodb.pins == null) {
+   if (! piodb.pins) {
       return null;
    }
    if (! piodb.changed) {

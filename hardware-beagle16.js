@@ -43,7 +43,7 @@
 //
 //      Push the current zone controls to the outside world.
 //
-//   hardware.rainsensor ();
+//   hardware.rainSensor ();
 //
 //      Return true or false, true if rain is detected. Always return
 //      false if there is no rain sensor.
@@ -103,7 +103,7 @@ catch (err) {
 var piodb = new Object(); // Make sure it exists (simplify validation).
 
 exports.configure = function (config) {
-   if ((io == null) || (! config.production)) {
+   if ((! io) || (! config.production)) {
       debuglog ('using debug I/O module');
       io = require('./iodebug');
    }
@@ -124,28 +124,28 @@ exports.configure = function (config) {
    piodb.levels.off = io.LOW;
    piodb.levels.edge = io.FALLING;
 
-   if (config.beagle16 != null) {
-      if (config.beagle16.rain != null) {
+   if (config.beagle16) {
+      if (config.beagle16.rain) {
          piodb.rain = config.beagle16.rain;
       }
-      if (config.beagle16.button != null) {
+      if (config.beagle16.button) {
          piodb.button = config.beagle16.button;
       }
-      if (config.beagle16.on != null) {
+      if (config.beagle16.on) {
          piodb.levels.on = config.beagle16.on;
       }
-      if (config.beagle16.off != null) {
+      if (config.beagle16.off) {
          piodb.levels.off = config.beagle16.off;
       }
-      if (config.beagle16.edge != null) {
+      if (config.beagle16.edge) {
          piodb.levels.edge = config.beagle16.edge;
       }
    }
 
-   if (piodb.rain != null) {
+   if (piodb.rain) {
       io.pinMode(piodb.rain, io.INPUT);
    }
-   if (piodb.button != null) {
+   if (piodb.button) {
       io.pinMode(piodb.button, io.INPUT);
    }
    for(var i = 0; i < zonecount; i++) {
@@ -154,7 +154,7 @@ exports.configure = function (config) {
 }
 
 exports.rainSensor = function () {
-   if (piodb.rain == null) {
+   if (! piodb.rain) {
       return false;
    }
    if (io.digitalRead(piodb.rain) > 0) {
@@ -164,7 +164,7 @@ exports.rainSensor = function () {
 }
 
 exports.button = function () {
-   if (piodb.button == null) {
+   if (! piodb.button) {
       return false;
    }
    if (io.digitalRead(piodb.button) == 0) {
@@ -174,21 +174,21 @@ exports.button = function () {
 }
 
 exports.rainInterrupt = function (callback) {
-   if (piodb.rain == null) {
+   if (! piodb.rain) {
       return null;
    }
    io.attachInterrupt(piodb.rain, true, piodb.levels.edge, callback);
 }
 
 exports.buttonInterrupt = function (callback) {
-   if (piodb.button == null) {
+   if (! piodb.button) {
       return null;
    }
    io.attachInterrupt(piodb.button, true, piodb.levels.edge, callback);
 }
 
 exports.setZone = function (zone, on) {
-   if (piodb.zones == null) {
+   if (! piodb.zones) {
       return null;
    }
    if (on) {

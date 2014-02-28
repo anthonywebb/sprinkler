@@ -44,7 +44,7 @@
 //
 //      Push the current zone controls to the outside world.
 //
-//   hardware.rainsensor ();
+//   hardware.rainSensor ();
 //
 //      Return true or false, true if rain is detected. Always return
 //      false if there is no rain sensor.
@@ -95,10 +95,10 @@ exports.configure = function (config) {
       debuglog ('configuring zone '+piodb.zones[i].name+' (#'+i+') as pin '+piodb.zones[i].pin);
    }
 
-   if (piodb.rain != null) {
+   if (piodb.rain) {
       debuglog ('configuring rain sensor as pin '+piodb.rain);
    }
-   if (piodb.button != null) {
+   if (piodb.button) {
       debuglog ('configuring button as pin '+piodb.rain);
    }
 }
@@ -120,7 +120,7 @@ exports.buttonInterrupt = function (callback) {
 }
 
 exports.setZone = function (zone, on) {
-   if (piodb == null) {
+   if (! piodb) {
       return null;
    }
    if (on) {
