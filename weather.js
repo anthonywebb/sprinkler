@@ -107,18 +107,18 @@ exports.configure = function (config) {
 
    restoreDefaults();
 
-   if (config.weather == null) return;
-   if (config.weather.key == null) return;
+   if (! config.weather) return;
+   if (! config.weather.key) return;
 
    url = 'http://api.wunderground.com/api/'
                 + config.weather.key + '/yesterday/conditions/q/'
                 + config.zipcode + '.json';
 
-   if (config.weather.adjust != null) {
-      if (config.weather.adjust.min != null) {
+   if (config.weather.adjust) {
+      if (config.weather.adjust.min) {
          minadjust = config.weather.adjust.min;
       }
-      if (config.weather.adjust.max != null) {
+      if (config.weather.adjust.max) {
          maxadjust = config.weather.adjust.max;
       }
    }
@@ -159,27 +159,34 @@ function getWeather () {
 
 exports.refresh = function () {
 
-   if (url == null) return;
-   getWeather();
+   if (url) {
+      getWeather();
+   }
 }
 
 exports.temperature = function () {
-   if (weatherConditions == null) return null;
-   return weatherConditions.history.dailysummary[0].meantempi - 0;
+   if (weatherConditions) {
+      return weatherConditions.history.dailysummary[0].meantempi - 0;
+   }
+   return null;
 }
 
 exports.humidity = function () {
-   if (weatherConditions == null) return null;
-   max = weatherConditions.history.dailysummary[0].maxhumidity - 0;
-   min = weatherConditions.history.dailysummary[0].minhumidity - 0;
-   return (max + min ) / 2;;
+   if (weatherConditions) {
+      max = weatherConditions.history.dailysummary[0].maxhumidity - 0;
+      min = weatherConditions.history.dailysummary[0].minhumidity - 0;
+      return (max + min ) / 2;;
+   }
+   return null;
 }
 
 exports.rain = function () {
-   if (weatherConditions == null) return null;
-   var precipi = weatherConditions.history.dailysummary[0].precipi - 0;
-   var today = weatherConditions.current_observation.precip_today_in - 0;
-   return precipi + today;
+   if (weatherConditions) {
+      var precipi = weatherConditions.history.dailysummary[0].precipi - 0;
+      var today = weatherConditions.current_observation.precip_today_in - 0;
+      return precipi + today;
+   }
+   return null;
 }
 
 exports.rainsensor = function () {

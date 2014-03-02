@@ -27,11 +27,25 @@
 //
 //   var hardware = require('./hardware');
 //
-//   hardware.configure (config);
+//   hardware.configure (hardwareConfig, userConfig);
 //
-//      Initialize the hardware module from the user configuration.
+//      Initialize the hardware module from the configuration.
 //      This method can be called as often as necessary (typically
-//      when the configuration has changed).
+//      when the user configuration has changed).
+//
+//   hardware.userDefined (attribute);
+//
+//      Return true when the user may change the given attribute.
+//      The supported attributes are:
+//         "zones"      The number of zones.
+//         "zones.pin"  The I/O pin, and the active pin level, for each zone.
+//
+//   hardware.get (attribute);
+//
+//      Return the current value of the given attribute.
+//      The supported attributes are:
+//         "zones"   The maximum number of zones. (Used only if not user
+//                   defined).
 //
 //   hardware.setZone (zone, on);
 //
@@ -65,26 +79,38 @@
 //      structure guaranteed to contain an (oddly named) "output"
 //      item that contains the value of the input pin.
 //
-// CONFIGURATION
+// HARDWARE CONFIGURATION
+//
+//   osbo.pins.data      The I/O pin to use for the data signal.
+//
+//   osbo.pins.clock     The I/O pin to use for the clock signal.
+//
+//   osbo.pins.enable    The I/O pin to use for the output enable signal.
+//
+//   osbo.pins.latch     The I/O pin to use for the data latch signal.
+//
+//   osbo.pins.rain      The I/O pin to use for the rain sensor.
+//
+//   osbo.pins.edge      The active edge of the rain sensor (RISING, FALLING).
+//
+// USER CONFIGURATION
+//
+//   production          This flag determines if we use the real hardware
+//                       (true) or else a simulation for debug (false).
 //
 //   zones               The name of each zone (an array of structures
-//                       containing item 'name').
-//
-//   osbo                An optional structure to redefine the standard
-//                       OSBo pins: data, clock, enable, latch, rain.
-//                       It also defines the active edge of the rain pin.
-//                       (This driver does not use the Beagle-16's toplevel
-//                       rain config item in the hope of avoiding havoc
-//                       that could be caused when forgetting to edit that
-//                       item when switching from one driver to another.)
+//                       containing item 'name'). This module only considers
+//                       the number of zones that have been configured by
+//                       the user, in order to decide how many extensions
+//                       are present.
 //
 
 function debuglog (text) {
-   console.log ('Hardware: '+text);
+   console.log ('Hardware(osbo): '+text);
 }
 
 function errorlog (text) {
-   console.error ('Hardware: '+text);
+   console.error ('Hardware(osbo): '+text);
 }
 
 try {
@@ -97,8 +123,8 @@ catch (err) {
 
 var piodb = new Object(); // Make sure it exists (simplify validation).
 
-exports.configure = function (config) {
-   if ((! io) || (! config.production)) {
+exports.configure = function (config, user) {
+   if ((! io) || (! user.production)) {
       debuglog ('using debug I/O module');
       io = require('./iodebug');
    }
@@ -142,13 +168,27 @@ exports.configure = function (config) {
    io.pinMode(piodb.pins.data, io.OUTPUT);
    io.pinMode(piodb.pins.latch, io.OUTPUT);
 
-   var zonecount = config.zones.length;
+   var zonecount = user.zones.length;
    piodb.zones = new Array();
    for(var i = 0; i < zonecount; i++) {
       piodb.zones[i] = new Object();
       piodb.zones[i].value = io.LOW;
    }
    piodb.changed = true; // We do not know the status, assume the worst.
+}
+
+exports.userDefined = function (attribute) {
+   if (attribute == 'zones') {
+      return true;
+   }
+   return false;
+}
+
+exports.get = function  (attribute) {
+   if (attribute == 'zones') {
+      return piodb.zones.count;
+   }
+   return null;
 }
 
 exports.rainSensor = function () {

@@ -28,6 +28,15 @@ function resetCounts() {
     }
 }
 
+try {
+    var hardwareConfig = fs.readFileSync('./hardware.json');
+    hardwareConfig = JSON.parse(hardwareConfig);
+}
+catch (err) {
+    console.error('There has been an error loading or parsing the hardware config')
+    console.error(err);
+} 
+
 var config = fs.readFileSync('./config.json');
 try {
     config = JSON.parse(config);
@@ -41,9 +50,14 @@ try {
     }
 }
 catch (err) {
-    console.error('There has been an error parsing your config')
+    console.error('There has been an error parsing the user config')
     console.error(err);
 } 
+
+if (!config.weather) {
+    config.weather = new Object();
+    config.weather.enable = false;
+}
 
 // load up the database
 var db = new nedb({ filename: './database', autoload: true });
@@ -65,7 +79,7 @@ var rainTimer = 0;
 // Calculate the real counts from the configuration we loaded.
 resetCounts();
 
-hardware.configure (config);
+hardware.configure (hardwareConfig, config);
 hardware.rainInterrupt (rainCallback);
 hardware.buttonInterrupt (buttonCallback);
 
@@ -73,7 +87,7 @@ function refreshConfig () {
 
     calendar.configure(config);
     weather.configure(config);
-    hardware.configure (config);
+    hardware.configure (hardwareConfig, config);
     hardware.rainInterrupt (rainCallback);
     hardware.buttonInterrupt (buttonCallback);
     resetCounts();

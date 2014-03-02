@@ -577,6 +577,8 @@ function loadNextCalendar () {
 // Method for periodic calendar refresh.
 exports.refresh = function () {
 
+   if (imported.calendar.length == 0) return;
+
    var time = new Date().getTime();
 
    // Throttle when to request for information, to limit traffic.

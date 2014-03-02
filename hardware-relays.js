@@ -2,12 +2,12 @@
 //
 // NAME
 //
-//   hardware - a module to hide the absence of hardware interface.
+//   hardware - a module to hide the interface to generic relay boards.
 //
 // SYNOPSYS
 //
-//   This module implements an interface to the board that controls
-//   the sprinkler (typically triacs or relays that control the solenoids).
+//   This module implements an interface to generic relay boards used as
+//   sprinkler controllers.
 //
 //   Each sprinkler triac or relay is called a "zone" (because it generally
 //   controls a watering valve, which waters a zone).
@@ -16,11 +16,10 @@
 //   hardware interfaces. Only one hardware interface is supported at
 //   a given time: you must have installed the right driver.
 //
-//   This module implements a null driver, used for debugging purposes.
+//   This specific implementation supports generic relay boards.
 //
 //   To enable this driver, create 'hardware.js' as a symbolic link to
-//   'hardware-null.js'.
-//
+//   'hardware-relays.js'.
 //
 // DESCRIPTION
 //
@@ -35,14 +34,16 @@
 //   hardware.userDefined (attribute);
 //
 //      Return true when the user may change the given attribute.
-//      (For this module, this function _always_ returns true.)
+//      The supported attributes are:
+//         "zones"      The number of zones.
+//         "zones.pin"  The I/O pin, and the active pin level, for each zone.
 //
 //   hardware.get (attribute);
 //
 //      Return the current value of the given attribute.
 //      The supported attributes are:
-//         "zones"   The maximum number of zones. (Used only if not user
-//                   defined).
+//         "zones"      The maximum number of zones. (Used only if not user
+//                      defined).
 //
 //   hardware.setZone (zone, on);
 //
@@ -80,30 +81,81 @@
 //
 // USER CONFIGURATION
 //
-//   zones               An array of structures containing one item named
-//                       'name' (the name of the zone).
+//   production          This flag determines if we use the real hardware
+//                       (true) or else a simulation for debug (false).
+//
+//   zones               This array of structures defines the name of
+//                       the output pin for each zone.
 //
 
-var piodb = null;
-
 function debuglog (text) {
-   console.log ('Hardware: '+text);
+   console.log ('Hardware(relays): '+text);
 }
 
+function errorlog (text) {
+   console.error ('Hardware(relays): '+text);
+}
+
+try {
+   var io = require('bonescript');
+}
+catch (err) {
+   errorlog ('cannot access module bonescript');
+   var io = null;
+}
+
+var piodb = new Object(); // Make sure it exists (simplify validation).
+
 exports.configure = function (config, user) {
+   if ((! io) || (! user.production)) {
+      debuglog ('using debug I/O module');
+      io = require('./iodebug');
+   }
+
+   // Set hardware configuration defaults.
    piodb = new Object();
 
-   var zonecount = user.zones.length;
    piodb.zones = new Array();
+   var zonecount = 0;
+
+   if (user.zones) {
+      var zonecount = user.zones.length;
+      for (var i = 0; i < zonecount; i++) {
+         piodb.zones[i] = new Object();
+         piodb.zones[i].pin = user.zones[i].pin;
+
+         piodb.zones[i].on = io.LOW;
+         piodb.zones[i].off = io.HIGH;
+
+         if (user.zones[i].on) {
+            if (user.zones[i].on == 'HIGH') {
+               piodb.zones[i].on = io.HIGH;
+               piodb.zones[i].off = io.LOW;
+            } else if (user.zones[i].on == 'LOW') {
+               piodb.zones[i].on = io.LOW;
+               piodb.zones[i].off = io.HIGH;
+            } else {
+               errorLog ('invalid pin level '+user.zones[i].on+', assuming LOW');
+               piodb.zones[i].on = io.LOW;
+               piodb.zones[i].off = io.HIGH;
+            }
+         }
+      }
+   }
    for(var i = 0; i < zonecount; i++) {
-      piodb.zones[i] = new Object();
-      piodb.zones[i].name = user.zones[i].name;
-      debuglog ('configuring zone '+piodb.zones[i].name+' (#'+i+')');
+      if (piodb.zones[i].pin) {
+         io.pinMode(piodb.zones[i].pin, io.OUTPUT);
+      }
    }
 }
 
 exports.userDefined = function (attribute) {
-   return true;
+   if (attribute == 'zones') {
+      return true;
+   } else if (attribute == 'zones.pin') {
+      return true;
+   }
+   return false;
 }
 
 exports.get = function  (attribute) {
@@ -130,17 +182,18 @@ exports.buttonInterrupt = function (callback) {
 }
 
 exports.setZone = function (zone, on) {
-   if (! piodb) {
+   if (! piodb.zones) {
+      return null;
+   }
+   if (! piodb.zones[zone].pin) {
       return null;
    }
    if (on) {
-      debuglog ('zone '+piodb.zones[zone].name+' (#'+zone+') set to on');
+      io.digitalWrite(piodb.zones[zone].pin, piodb.zones[zone].on);
    } else {
-      debuglog ('zone '+piodb.zones[zone].name+' (#'+zone+') set to off');
+      io.digitalWrite(piodb.zones[zone].pin, piodb.zones[zone].off);
    }
 }
 
-exports.apply = function () {
-   debuglog ('apply');
-}
+exports.apply = function () { }
 

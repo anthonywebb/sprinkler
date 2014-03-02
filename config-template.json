@@ -4,38 +4,27 @@
         "port": 8080
     },
     "zones": [
-        {"name":"Zone 1","pin":"P9_11"},
-        {"name":"Zone 2","pin":"P9_13"},
-        {"name":"Zone 3","pin":"P9_15"},
-        {"name":"Zone 4","pin":"P9_17"},
-        {"name":"Zone 5","pin":"P9_21"},
-        {"name":"Zone 6","pin":"P9_23"},
-        {"name":"Zone 7","pin":"P9_25"},
-        {"name":"Zone 8","pin":"P9_27"},
-        {"name":"Zone 9","pin":"P9_28"},
-        {"name":"Zone 10","pin":"P9_26"},
-        {"name":"Zone 11","pin":"P9_24"},
-        {"name":"Zone 12","pin":"P9_22"},
-        {"name":"Zone 13","pin":"P9_18"},
-        {"name":"Zone 14","pin":"P9_16"},
-        {"name":"Zone 15","pin":"P9_14"},
-        {"name":"Zone 16","pin":"P9_12"}
+        {"name":"Zone 1"},
+        {"name":"Zone 2"},
+        {"name":"Zone 3"},
+        {"name":"Zone 4"},
+        {"name":"Zone 5"},
+        {"name":"Zone 6"},
+        {"name":"Zone 7"},
+        {"name":"Zone 8"},
+        {"name":"Zone 9"},
+        {"name":"Zone 10"},
+        {"name":"Zone 11"},
+        {"name":"Zone 12"},
+        {"name":"Zone 13"},
+        {"name":"Zone 14"},
+        {"name":"Zone 15"},
+        {"name":"Zone 16"}
     ],
     "location": "home",
     "zipcode": "83406",
     "timezone": "America/Boise",
     "raindelay": true,
-    "beagle16": {
-        "rain": "P9_29",
-        "button": "P9_30"
-    },
-    "osbo": {
-        "data": "P9_11",
-        "clock": "P9_13",
-        "enable": "P9_14",
-        "latch": "P9_15",
-        "rain": "P9_15"
-    },
     "production": false,
     "programs": [
         {

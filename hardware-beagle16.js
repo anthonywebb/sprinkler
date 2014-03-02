@@ -25,11 +25,26 @@
 //
 //   var hardware = require('./hardware');
 //
-//   hardware.configure (config);
+//   hardware.configure (hardwareConfig, userConfig);
 //
-//      Initialize the hardware module from the user configuration.
+//      Initialize the hardware module from the configuration.
 //      This method can be called as often as necessary (typically
-//      when the configuration has changed).
+//      when the user configuration has changed).
+//
+//   hardware.userDefined (attribute);
+//
+//      Return true when the user may change the given attribute.
+//      The supported attributes are:
+//         "zones"      The number of zones.
+//         "zones.pin"  The I/O pin, and the active pin level, for each zone.
+//      (For this module, this function always return false.)
+//
+//   hardware.get (attribute);
+//
+//      Return the current value of the given attribute.
+//      The supported attributes are:
+//         "zones"   The maximum number of zones. (Used only if not user
+//                   defined).
 //
 //   hardware.setZone (zone, on);
 //
@@ -61,17 +76,15 @@
 //      structure guaranteed to contain an (oddly named) "output"
 //      item that contains the value of the input pin.
 //
-// CONFIGURATION
+// HARDWARE CONFIGURATION
 //
-//   rain                The name of the input pin for the rain sensor.
-//                       Rain sensor is ignored if omitted. Superseeded
-//                       by the beagle16.rain item, if present.
+//   beagle16.rain       The name of the input pin for the rain sensor.
+//                       The rain sensor is not active if this item is absent.
 //
-//   button              The name of the input pin for the button.
-//                       Button is ignored if omitted. Superseeded
-//                       by the beagle16.button item, if present.
+//   beagle16.button     The name of the input pin for the button.
+//                       The button is not active if this item is absent.
 //
-//   zones               This array of structures defines the name of
+//   beagle16.zones      This array of structures defines the name of
 //                       the output pin for each zone.
 //
 //   beagle16            Defines some specific pins (rain, button) and
@@ -83,13 +96,17 @@
 //                       (The rain and button defined here take precedence
 //                       over the toplevel rain and button configuration.)
 //
+// USER CONFIGURATION
+//
+//   production          This flag determines if we use the real hardware
+//                       (true) or else a simulation for debug (false).
 
 function debuglog (text) {
-   console.log ('Hardware: '+text);
+   console.log ('Hardware(beagle16): '+text);
 }
 
 function errorlog (text) {
-   console.error ('Hardware: '+text);
+   console.error ('Hardware(beagle16): '+text);
 }
 
 try {
@@ -102,43 +119,78 @@ catch (err) {
 
 var piodb = new Object(); // Make sure it exists (simplify validation).
 
-exports.configure = function (config) {
-   if ((! io) || (! config.production)) {
+exports.configure = function (config, user) {
+   if ((! io) || (! user.production)) {
       debuglog ('using debug I/O module');
       io = require('./iodebug');
    }
+
+   // Set hardware configuration defaults.
    piodb = new Object();
 
-   piodb.rain = config.rain;
-   piodb.button = config.button;
-
-   var zonecount = config.zones.length;
-   piodb.zones = new Array();
-   for(var i = 0; i < zonecount; i++) {
-      piodb.zones[i] = new Object();
-      piodb.zones[i].pin = config.zones[i].pin;
-   }
+   piodb.rain = "P9_29";
+   piodb.button = "P9_30";
 
    piodb.levels = new Object();
    piodb.levels.on = io.HIGH;
    piodb.levels.off = io.LOW;
    piodb.levels.edge = io.FALLING;
 
-   if (config.beagle16) {
-      if (config.beagle16.rain) {
-         piodb.rain = config.beagle16.rain;
-      }
-      if (config.beagle16.button) {
-         piodb.button = config.beagle16.button;
-      }
-      if (config.beagle16.on) {
-         piodb.levels.on = config.beagle16.on;
-      }
-      if (config.beagle16.off) {
-         piodb.levels.off = config.beagle16.off;
-      }
-      if (config.beagle16.edge) {
-         piodb.levels.edge = config.beagle16.edge;
+   piodb.zones = [
+            {pin:"P9_11"},
+            {pin:"P9_13"},
+            {pin:"P9_15"},
+            {pin:"P9_17"},
+            {pin:"P9_21"},
+            {pin:"P9_23"},
+            {pin:"P9_25"},
+            {pin:"P9_27"},
+            {pin:"P9_28"},
+            {pin:"P9_26"},
+            {pin:"P9_24"},
+            {pin:"P9_22"},
+            {pin:"P9_18"},
+            {pin:"P9_16"},
+            {pin:"P9_14"},
+            {pin:"P9_12"}
+        ];
+
+   if (config) {
+      if (config.beagle16) {
+
+         var zonecount = config.beagle16.zones.length;
+         piodb.zones = new Array();
+         for(var i = 0; i < zonecount; i++) {
+            piodb.zones[i] = new Object();
+            piodb.zones[i].pin = config.beagle16.zones[i].pin;
+         }
+
+         if (config.beagle16.rain) {
+            piodb.rain = config.beagle16.rain;
+         }
+         if (config.beagle16.button) {
+            piodb.button = config.beagle16.button;
+         }
+         if (config.beagle16.on) {
+            if (config.beagle16.on == 'HIGH') {
+               piodb.levels.on = io.HIGH;
+               piodb.levels.off = io.LOW;
+            } else if (config.beagle16.on == 'LOW') {
+               piodb.levels.on = io.LOW;
+               piodb.levels.off = io.HIGH;
+            } else {
+               errorLog ('invalid pin level '+config.beagle16.on+', ignored');
+            }
+         }
+         if (config.beagle16.edge) {
+            if (config.beagle16.edge == 'RISING') {
+               piodb.levels.edge = io.RISING;
+            } else if (config.beagle16.edge == 'FALLING') {
+               piodb.levels.edge = io.FALLING;
+            } else {
+               errorLog ('invalid edge '+config.beagle16.edge+', ignored');
+            }
+         }
       }
    }
 
@@ -151,6 +203,17 @@ exports.configure = function (config) {
    for(var i = 0; i < zonecount; i++) {
       io.pinMode(piodb.zones[i].pin, io.OUTPUT);
    }
+}
+
+exports.userDefined = function (attribute) {
+   return false;
+}
+
+exports.get = function  (attribute) {
+   if (attribute == 'zones') {
+      return piodb.zones.count;
+   }
+   return null;
 }
 
 exports.rainSensor = function () {
