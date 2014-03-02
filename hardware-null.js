@@ -32,17 +32,18 @@
 //      This method can be called as often as necessary (typically
 //      when the user configuration has changed).
 //
-//   hardware.userDefined (attribute);
+//   hardware.info ();
 //
-//      Return true when the user may change the given attribute.
-//      (For this module, this function _always_ returns true.)
-//
-//   hardware.get (attribute);
-//
-//      Return the current value of the given attribute.
-//      The supported attributes are:
-//         "zones"   The maximum number of zones. (Used only if not user
-//                   defined).
+//      Return a data structure that describes the hardware managed by
+//      this driver. The data structure contains the following elements:
+//         id           A short unique identification string for the driver.
+//         title        A human-readable string that describes the hardware.
+//         zones.add    If true, the end-user may add (or remove) zones.
+//         zones.pin    If true, the end-user may set the pin name and active
+//                      state ('on' state).
+//         zones.max    If set, defines the maximum number of zones supported
+//                      by the hardware. If zones.max is defined and zones.add
+//                      is set to false, then the number of zones is fixed.
 //
 //   hardware.setZone (zone, on);
 //
@@ -102,15 +103,8 @@ exports.configure = function (config, user) {
    }
 }
 
-exports.userDefined = function (attribute) {
-   return true;
-}
-
-exports.get = function  (attribute) {
-   if (attribute == 'zones') {
-      return piodb.zones.count;
-   }
-   return null;
+exports.info = function (attribute) {
+   return {id:"null",title:"Null Debug Driver",zones:{add:true,pin:true}};
 }
 
 exports.rainSensor = function () {

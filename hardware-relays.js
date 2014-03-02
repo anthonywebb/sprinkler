@@ -31,6 +31,19 @@
 //      This method can be called as often as necessary (typically
 //      when the user configuration has changed).
 //
+//   hardware.info ();
+//
+//      Return a data structure that describes the hardware managed by
+//      this driver. The data structure contains the following elements:
+//         id           A short unique identification string for the driver.
+//         title        A human-readable string that describes the hardware.
+//         zones.add    If true, the end-user may add (or remove) zones.
+//         zones.pin    If true, the end-user may set the pin name and active
+//                      state ('on' state).
+//         zones.max    If set, defines the maximum number of zones supported
+//                      by the hardware. If zones.max is defined and zones.add
+//                      is set to false, then the number of zones is fixed.
+//
 //   hardware.userDefined (attribute);
 //
 //      Return true when the user may change the given attribute.
@@ -149,20 +162,8 @@ exports.configure = function (config, user) {
    }
 }
 
-exports.userDefined = function (attribute) {
-   if (attribute == 'zones') {
-      return true;
-   } else if (attribute == 'zones.pin') {
-      return true;
-   }
-   return false;
-}
-
-exports.get = function  (attribute) {
-   if (attribute == 'zones') {
-      return piodb.zones.count;
-   }
-   return null;
+exports.info = function (attribute) {
+   return {id:"relays",title:"Generic Relay Board",zones:{add:true,pin:true}};
 }
 
 exports.rainSensor = function () {

@@ -254,6 +254,11 @@ app.get('/program/:id/on', function(req, res){
     }
 });
 
+// Routes
+app.get('/hardware/info', function(req, res){
+    res.json(hardware.info());
+});
+
 ///////////////////////////////////////
 // SCHEDULER
 //////////////////////////////////////
