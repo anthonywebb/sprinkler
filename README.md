@@ -12,7 +12,8 @@ This software also includes early support for the OpenSprinkler OSBo board.
 4. To run, simply type: `node server.js`
 
 Note that there are drivers for 3 types of hardware availables:
-1. The Sprinkler Beagle 16 board (`hardware-beagle16.js`),
+
+1. The Sprinkler Beagle 16 board (`hardware-beagle16.js`).
 2. The OpenSprinkler's OSBo board from rayshobby.net (`hardware-osbo.js`).
 3. Generic relay boards, such as the SainSmart ones (`hardware-relays.js`). Each relay must be directly connected to one I/O pin. Setup the `pin` name and the `on` level in the user config (`config.json`).
 
@@ -39,10 +40,11 @@ Watering programs can be automatically adjusted using weather information from t
 
 1. The user must register with Weather Underground to get his own key.
 2. The weather module is configured in config.json as the `weather` structure:
-3. The `weather.key` item must be set to the Weather Underground key.
-4. The `weather.adjust.min` item represents the minimum allowed adjustment.
-5. The `weather.adjust.max` item represents the maximum allowed adjustment.
-6. The `weather.raintrigger` item represents the rain level (in inches) that triggers a virtual rain sensor.
+3. The `weather.enable` item must be set to `true`, otherwise no watering time adjustment is performed.
+4. The `weather.key` item must be set to the Weather Underground key.
+5. The `weather.adjust.min` item represents the minimum allowed adjustment.
+6. The `weather.adjust.max` item represents the maximum allowed adjustment.
+7. The `weather.raintrigger` item represents the rain level (in inches) that triggers a virtual rain sensor.
 
 ## Contributing
 
