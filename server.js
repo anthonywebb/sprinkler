@@ -2,11 +2,27 @@ var fs = require('graceful-fs');
 var dgram = require('dgram');
 var express = require('express');
 var moment = require('moment-timezone');
-var nedb = require('nedb'); 
 
+var event = require('./event');
+var hardware = require('./hardware');
 var calendar = require('./calendar');
 var weather = require('./weather');
-var hardware = require('./hardware');
+
+
+// Some of our default vars
+var zoneTimer = null;
+var zoneInterval = null;
+var running = {};
+var runqueue = [];
+var currOn = 0;
+var buttonTimer = null;
+var lastScheduleCheck = null;
+var zonecount = 0;
+var programcount = 0;
+
+var rainDelayInterval = 86340000; // 1 day - 1 minute.
+var rainTimer = 0;
+
 
 ///////////////////////////////////////
 // LOAD THE PROGRAM CONFIGURATION
@@ -28,68 +44,15 @@ function resetCounts() {
     }
 }
 
-try {
-    var hardwareConfig = fs.readFileSync('./hardware.json');
-    hardwareConfig = JSON.parse(hardwareConfig);
-}
-catch (err) {
-    console.error('There has been an error loading or parsing the hardware config')
-    console.error(err);
-} 
+function activateConfig () {
 
-var config = fs.readFileSync('./config.json');
-try {
-    config = JSON.parse(config);
-    //console.log(config);
-    calendar.configure(config);
-    weather.configure(config);
-
-    if (config.udp == null) {
-       config.udp = new Object();
-       config.udp.port = config.webserver.port;
-    }
-}
-catch (err) {
-    console.error('There has been an error parsing the user config')
-    console.error(err);
-} 
-
-if (!config.weather) {
-    config.weather = new Object();
-    config.weather.enable = false;
-}
-
-// load up the database
-var db = new nedb({ filename: './database', autoload: true });
-
-// Some of our default vars
-var zoneTimer = null;
-var zoneInterval = null;
-var running = {};
-var runqueue = [];
-var currOn = 0;
-var buttonTimer = null;
-var lastScheduleCheck = null;
-var zonecount = 0;
-var programcount = 0;
-
-var rainDelayInterval = 86340000; // 1 day - 1 minute.
-var rainTimer = 0;
-
-// Calculate the real counts from the configuration we loaded.
-resetCounts();
-
-hardware.configure (hardwareConfig, config);
-hardware.rainInterrupt (rainCallback);
-hardware.buttonInterrupt (buttonCallback);
-
-function refreshConfig () {
-
-    calendar.configure(config);
-    weather.configure(config);
+    event.configure(config);
     hardware.configure (hardwareConfig, config);
     hardware.rainInterrupt (rainCallback);
     hardware.buttonInterrupt (buttonCallback);
+    calendar.configure(config);
+    weather.configure(config);
+    // Calculate the real counts from the configuration we loaded.
     resetCounts();
 }
 
@@ -108,6 +71,33 @@ function saveConfig (body) {
     });
 }
 
+try {
+    var hardwareConfig = fs.readFileSync('./hardware.json');
+    hardwareConfig = JSON.parse(hardwareConfig);
+}
+catch (err) {
+    console.error('There has been an error loading or parsing the hardware config')
+    console.error(err);
+} 
+
+var config = fs.readFileSync('./config.json');
+try {
+    config = JSON.parse(config);
+    //console.log(config);
+
+    activateConfig();
+}
+catch (err) {
+    console.error('There has been an error parsing the user config')
+    console.error(err);
+} 
+
+if (!config.weather) {
+    config.weather = new Object();
+    config.weather.enable = false;
+}
+
+
 ///////////////////////////////////////
 // CONFIGURE THE WEBSERVER
 //////////////////////////////////////
@@ -115,6 +105,7 @@ var app = express();
 app.use(express.favicon());
 app.use(express.bodyParser());
 app.use(app.router);
+app.use(express.static(__dirname+'/public'));
 app.use(missingHandler);
 
 // Routes
@@ -211,26 +202,73 @@ app.get('/refresh', function(req, res){
 });
 
 app.get('/history', function(req, res){
-    // Finding all the history for this zone
-    db.find({}, function (err, docs) {
-        if(err){
-            console.error(err);
-            res.json({status: 'error', msg:err.message});
-        } else {
-            reportHistory(res, docs);
-        }
+    // Finding all the history for all zones
+    event.find({}, function (response) {
+        res.json(response);
     });
+});
+
+app.get('/system/history', function(req, res){
+    // Finding all the system events
+    event.find({action: {$nin:['START', 'END', 'CANCEL']}}, function (response) {
+        res.json(response);
+    });
+});
+
+function retrieveProgramById (id) {
+
+    if (id.match(/C/)) {
+       var index = parseInt(id.substring(1));
+       var programs = calendar.programs();
+       if(index>=0 && index<programs.length){
+          return programs[index];
+       }
+       return null;
+    }
+    if (id.match(/L/)) {
+       var index = parseInt(id.substring(1));
+       if(index>=0 && index<config.programs.length){
+          return config.programs[index];
+       }
+       return null;
+    }
+    var index = parseInt(id);
+    if(index>=0 && index<config.programs.length){
+       return config.programs[index];
+    }
+    return null;
+}
+
+app.get('/program/:id/history', function(req, res){
+    // Finding the history's main events for this program
+    var program = retrieveProgramById (req.params.id);
+    if (program) {
+       event.find({program: program.name}, function (response) {
+        res.json(response);
+       });
+    }
+    else {
+        errorHandler(res,''+req.params.id+' is not a valid program');
+    }
+});
+
+app.get('/program/:id/full/history', function(req, res){
+    // Finding all the history for this program
+    var program = retrieveProgramById (req.params.id);
+    if (program) {
+       event.find({$or:[{program:program.name}, {parent:program.name}]}, function (response) {
+        res.json(response);
+       });
+    }
+    else {
+        errorHandler(res,''+req.params.id+' is not a valid program');
+    }
 });
 
 app.get('/zone/:id/history', function(req, res){
     // Finding all the history for this zone
-    db.find({ zone: parseInt(req.params.id) }, function (err, docs) {
-        if(err){
-            console.error(err);
-            res.json({status: 'error', msg:err.message});
-        } else {
-            reportHistory(res, docs);
-        }
+    event.find({ zone: parseInt(req.params.id) }, function (response) {
+        res.json(response);
     });
 });
 
@@ -240,21 +278,21 @@ app.get('/zone/:id/on/:seconds', function(req, res){
         res.json({status:'ok',msg:'started zone: '+config.zones[req.params.id].name});    
     }
     else {
-        errorHandler(res,'That is not a valid zone')
+        errorHandler(res,''+req.params.id+' is not a valid zone')
     }
 });
 
 app.get('/program/:id/on', function(req, res){
-    if(req.params.id>=0 && req.params.id<programcount){
-        programOn(config.programs[req.params.id]);
-        res.json({status:'ok',msg:'started program: '+config.programs[req.params.id].name});    
+    var program = retrieveProgramById (req.params.id);
+    if (program) {
+        programOn(program);
+        res.json({status:'ok',msg:'started program: '+program.name});    
     }
     else {
-        errorHandler(res,'That is not a valid program');
+        errorHandler(res,''+req.params.id+' is not a valid program');
     }
 });
 
-// Routes
 app.get('/hardware/info', function(req, res){
     res.json(hardware.info());
 });
@@ -378,6 +416,10 @@ setInterval(function(){
 
 // Start auto discovery UDP broadcast ping
 //
+if (config.udp == null) {
+   config.udp = new Object();
+   config.udp.port = config.webserver.port;
+}
 var message = new Buffer("sprinkler "+config.webserver.port);
 var socket = dgram.createSocket("udp4");
 // TBD: better use callback: socket.bind(config.webserver.port, function() {
@@ -394,29 +436,11 @@ setInterval(function(){
     });
 },6000);
 
-logEvent({action: 'STARTUP'});
+event.record({action: 'STARTUP'});
 
 ///////////////////////////////////////
 // HELPERS
 //////////////////////////////////////
-
-function reportHistory (res, docs) {
-   // The history is sorted most recent first.
-   docs.sort(function (a, b) {
-       return b.timestamp - a.timestamp;
-   });
-   res.json({status: 'ok', history:docs});    
-}
-
-function logEvent (data) {
-    data.timestamp = new Date();
-    db.insert(data, function (err, newDoc) {
-        if(err){
-            console.error('Database insert error: '+err);
-        }
-        //console.log('wrote record '+newDoc._id);
-    });    
-}
 
 function missingHandler(req, res, next) {
     console.log('404 Not found - '+req.url);
@@ -447,10 +471,19 @@ function zoneOn(index,seconds) {
 
 function programOn(program) {
     killQueue();
-    console.log ('Running program '+programs[i].name);
-    logEvent({action: 'START', program: program.name, temperature: weather.temperature(), humidity: weather.humidity(), rain: weather.rain(), adjustment: weather.adjustment()});
+    console.log ('Running program '+program.name);
+    event.record({action: 'START', program: program.name, temperature: weather.temperature(), humidity: weather.humidity(), rain: weather.rain(), adjustment: weather.adjustment()});
 
-    runqueue = program.zones;
+    // We need to clone the list of zones because we remove each item from
+    // the list of zones in the queue after it has run its course: without
+    // cloning we would destroy the list of zones in the program itself.
+    runqueue = new Array();
+    for (var i = 0; i < program.zones.length; i++) {
+        runqueue[i] = new Object();
+        runqueue[i].parent = program.name;
+        runqueue[i].zone = program.zones[i].zone;
+        runqueue[i].seconds = program.zones[i].seconds;
+    }
 
     if (config.weather.enable) {
         // Adjust the program's zones duration according to the weather.
@@ -458,7 +491,6 @@ function programOn(program) {
         // zone: the user knows what he is doing.
 
         for (var i = 0; i < runqueue.length; i++) {
-             runqueue[i].parent = program.name;
              runqueue[i].seconds =
                  (runqueue[i].seconds * weather.adjustment()) / 100;
         }
@@ -475,7 +507,7 @@ function zonesOff() {
     if(running.seconds) {
         if(running.remaining == 1) running.remaining = 0;
         var runtime = running.seconds-running.remaining;
-        logEvent({action: 'CANCEL', zone: running.zone-0, parent: running.parent, seconds: running.seconds, runtime: runtime});
+        event.record({action: 'CANCEL', zone: running.zone-0, parent: running.parent, seconds: running.seconds, runtime: runtime});
     }
 
     running = {};
@@ -510,7 +542,7 @@ function processQueue() {
             console.error('Invalid zone '+running.zone);
             return;
         }
-        logEvent({action: 'START', zone:running.zone-0, parent: running.parent, seconds: running.seconds});
+        event.record({action: 'START', zone:running.zone-0, parent: running.parent, seconds: running.seconds});
 
         running.remaining = running.seconds;
 
@@ -522,7 +554,7 @@ function processQueue() {
 
         // count down the time remaining
         zoneInterval = setInterval(function(){
-            if(running.zone){
+            if(running.zone != null){
                 running.remaining = running.remaining - 1;
             }
                 
@@ -533,7 +565,15 @@ function processQueue() {
             hardware.setZone (running.zone, false);
             hardware.apply();
 
-            logEvent({action: 'END', zone: running.zone-0, parent: running.parent, seconds: running.seconds, runtime: running.seconds});
+            event.record({action: 'END', zone: running.zone-0, parent: running.parent, seconds: running.seconds, runtime: running.seconds});
+
+            if (runqueue.length) {
+               if (running.parent != runqueue[0].parent) {
+                  event.record({action: 'END', program: running.parent});
+               }
+            } else {
+               event.record({action: 'END', program: running.parent});
+            }
             running = {};
 
             // wait a couple seconds and kick off the next
@@ -547,7 +587,7 @@ function processQueue() {
         // once there is nothing left to process we can clear the timers
         zonesOff();
         clearTimers();
-        logEvent({action: 'IDLE'});
+        event.record({action: 'IDLE'});
     }
 }
 

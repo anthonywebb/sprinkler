@@ -46,6 +46,12 @@ Watering programs can be automatically adjusted using weather information from t
 6. The `weather.adjust.max` item represents the maximum allowed adjustment.
 7. The `weather.raintrigger` item represents the rain level (in inches) that triggers a virtual rain sensor.
 
+The application records all operations (start and end of program, start and
+end of zone, etc) as events. Such events go to a NeDB database (file
+`database`) and to syslog if the `syslog` option is set to `true` in the
+configuration. This syslog interface is enabled only if `node-syslog` has
+been installed (but the application can still run without).
+
 ## Contributing
 
 1. Fork it!
