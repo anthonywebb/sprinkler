@@ -67,7 +67,7 @@ function saveConfig (body) {
         }
         console.log('Configuration saved successfully.');
         config = body;
-        refreshConfig();
+        activateConfig();
     });
 }
 
@@ -197,7 +197,7 @@ app.get('/weather/:flag', function(req, res){
 });
 
 app.get('/refresh', function(req, res){
-    refreshConfig();
+    activateConfig();
     res.json({status:'ok',msg:'Refresh initiated'});
 });
 
@@ -472,7 +472,6 @@ function zoneOn(index,seconds) {
 function programOn(program) {
     killQueue();
     console.log ('Running program '+program.name);
-    event.record({action: 'START', program: program.name, temperature: weather.temperature(), humidity: weather.humidity(), rain: weather.rain(), adjustment: weather.adjustment()});
 
     // We need to clone the list of zones because we remove each item from
     // the list of zones in the queue after it has run its course: without
@@ -485,16 +484,19 @@ function programOn(program) {
         runqueue[i].seconds = program.zones[i].seconds;
     }
 
+    var adjustment = 100;
+
     if (config.weather.enable) {
         // Adjust the program's zones duration according to the weather.
         // Note that we do not adjust a manual activation on an individual
         // zone: the user knows what he is doing.
+        adjustment = weather.adjustment();
 
         for (var i = 0; i < runqueue.length; i++) {
-             runqueue[i].seconds =
-                 (runqueue[i].seconds * weather.adjustment()) / 100;
+             runqueue[i].seconds = (runqueue[i].seconds * adjustment) / 100;
         }
     }
+    event.record({action: 'START', program: program.name, temperature: weather.temperature(), humidity: weather.humidity(), rain: weather.rain(), adjustment: adjustment});
     processQueue();
 }
 

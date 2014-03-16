@@ -79,7 +79,11 @@ exports.record = function (data) {
          description = ' zone '+data.zone;
       }
       if (data.program) {
-         description = ' program '+data.program;
+         if (data.adjustment) {
+            description = ' program '+data.program+' (weather adjustment: '+data.adjustment+'%)';
+         } else {
+            description = ' program '+data.program;
+         }
       }
       if (data.parent) {
          parent = ' (program '+data.parent+')';
