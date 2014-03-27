@@ -83,7 +83,7 @@ catch (err) {
 var config = fs.readFileSync('./config.json');
 try {
     config = JSON.parse(config);
-    //console.log(config);
+    console.log("User configuration parsed");
 
     activateConfig();
 }
@@ -478,6 +478,17 @@ function programOn(program) {
     // cloning we would destroy the list of zones in the program itself.
     runqueue = new Array();
     for (var i = 0; i < program.zones.length; i++) {
+
+        // Add the capability to disable one zone, when activated from
+        // a program. Keep the ability to control it manually. This is
+        // typically for a zone with a problem (broken pipe, leak, etc).
+        // This way one can avoid this zone without modifying all programs.
+        //
+        if (config.zones[program.zones[i].zone].manual) {
+           event.record({action: 'SKIP', zone:program.zones[i].zone-0, parent: program.name, seconds: 0});
+           continue;
+        }
+
         runqueue[i] = new Object();
         runqueue[i].parent = program.name;
         runqueue[i].zone = program.zones[i].zone;
@@ -569,12 +580,14 @@ function processQueue() {
 
             event.record({action: 'END', zone: running.zone-0, parent: running.parent, seconds: running.seconds, runtime: running.seconds});
 
-            if (runqueue.length) {
-               if (running.parent != runqueue[0].parent) {
+            if (running.parent) {
+               if (runqueue.length) {
+                  if (running.parent != runqueue[0].parent) {
+                     event.record({action: 'END', program: running.parent});
+                  }
+               } else {
                   event.record({action: 'END', program: running.parent});
                }
-            } else {
-               event.record({action: 'END', program: running.parent});
             }
             running = {};
 

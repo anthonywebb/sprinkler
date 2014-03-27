@@ -21,6 +21,10 @@
 //   To enable this driver, create 'hardware.js' as a symbolic link to
 //   'hardware-relays.js'.
 //
+//   This module depends on 'onoff' because that is one gpio interface
+//   that is available on BeagleBone and Raspberry Pi (and probably others,
+//   since it only relies on /sys/class/gpio).
+//
 // DESCRIPTION
 //
 //   var hardware = require('./hardware');
@@ -110,19 +114,32 @@ function errorlog (text) {
 }
 
 try {
-   var io = require('bonescript');
+   var gpio = require('onoff').Gpio;
 }
 catch (err) {
-   errorlog ('cannot access module bonescript');
-   var io = null;
+   errorlog ('cannot access module onoff');
+   var gpio = null;
 }
 
 var piodb = new Object(); // Make sure it exists (simplify validation).
 
+// Raspbian bug: access to the gpio files is only granted
+// after a short while, in the background.
+// Need to try again if it failed.
+function retry(i) {
+   debuglog ('Setting up zone '+i+' failed, scheduling retry in 0.5 second');
+   setTimeout (function() {
+      debuglog ('Retrying zone '+i);
+      piodb.zones[i].gpio = new gpio(piodb.zones[i].pin, 'out');
+      piodb.zones[i].ready = true;
+      exports.setZone(i, piodb.zones[i].on);
+   }, 500);
+}
+
 exports.configure = function (config, user) {
-   if ((! io) || (! user.production)) {
-      debuglog ('using debug I/O module');
-      io = require('./iodebug');
+   if ((! gpio) || (! user.production)) {
+      debuglog ('using debug GPIO traces');
+      gpio = null;
    }
 
    // Set hardware configuration defaults.
@@ -135,29 +152,40 @@ exports.configure = function (config, user) {
       var zonecount = user.zones.length;
       for (var i = 0; i < zonecount; i++) {
          piodb.zones[i] = new Object();
-         piodb.zones[i].pin = user.zones[i].pin;
+         if (gpio) {
+            // Raspbian bug: access to the gpio files is only granted
+            // after a short while, in the background.
+            // Need to try again if it failed.
+            piodb.zones[i].ready = false;
+            piodb.zones[i].pin = user.zones[i].pin;
+            try {
+               piodb.zones[i].gpio = new gpio(piodb.zones[i].pin, 'out');
+               piodb.zones[i].ready = true; // No error.
+            }
+            catch (err) {
+               retry(i);
+            }
+         } else {
+            piodb.zones[i].pin = user.zones[i].pin;
+         }
 
-         piodb.zones[i].on = io.LOW;
-         piodb.zones[i].off = io.HIGH;
+         piodb.zones[i].on = 0;
+         piodb.zones[i].off = 1;
 
          if (user.zones[i].on) {
             if (user.zones[i].on == 'HIGH') {
-               piodb.zones[i].on = io.HIGH;
-               piodb.zones[i].off = io.LOW;
+               piodb.zones[i].on = 1;
+               piodb.zones[i].off = 0;
             } else if (user.zones[i].on == 'LOW') {
-               piodb.zones[i].on = io.LOW;
-               piodb.zones[i].off = io.HIGH;
+               piodb.zones[i].on = 0;
+               piodb.zones[i].off = 1;
             } else {
                errorLog ('invalid pin level '+user.zones[i].on+', assuming LOW');
-               piodb.zones[i].on = io.LOW;
-               piodb.zones[i].off = io.HIGH;
+               piodb.zones[i].on = 0;
+               piodb.zones[i].off = 1;
             }
          }
-      }
-   }
-   for(var i = 0; i < zonecount; i++) {
-      if (piodb.zones[i].pin) {
-         io.pinMode(piodb.zones[i].pin, io.OUTPUT);
+         piodb.zones[i].on = false;
       }
    }
 }
@@ -189,10 +217,23 @@ exports.setZone = function (zone, on) {
    if (! piodb.zones[zone].pin) {
       return null;
    }
-   if (on) {
-      io.digitalWrite(piodb.zones[zone].pin, piodb.zones[zone].on);
+   piodb.zones[zone].on = on;
+   if (! piodb.zones[zone].ready) {
+      return null; // This pin will be set later, when ready.
+   }
+   debuglog ('GPIO '+piodb.zones[zone].pin+' set to '+on);
+   if (gpio) {
+      if (on) {
+         piodb.zones[zone].gpio.writeSync(piodb.zones[zone].on);
+      } else {
+         piodb.zones[zone].gpio.writeSync(piodb.zones[zone].off);
+      }
    } else {
-      io.digitalWrite(piodb.zones[zone].pin, piodb.zones[zone].off);
+      if (on) {
+         debuglog ('GPIO '+piodb.zones[zone].pin+' set to on ('+piodb.zones[zone].on+')');
+      } else {
+         debuglog ('GPIO '+piodb.zones[zone].pin+' set to off ('+piodb.zones[zone].off+')');
+      }
    }
 }
 
