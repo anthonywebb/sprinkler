@@ -3,6 +3,7 @@ var dgram = require('dgram');
 var express = require('express');
 var moment = require('moment-timezone');
 
+var path = require('./path');
 var event = require('./event');
 var hardware = require('./hardware');
 var calendar = require('./calendar');
@@ -60,7 +61,7 @@ function saveConfig (body) {
 
     var data = JSON.stringify(body);
 
-    fs.writeFile('./config.json', data, function (err) {
+    fs.writeFile(path.userConfig(), data, function (err) {
         if (err) {
             console.error('failed to save configuration data: '+err.message);
             return;
@@ -72,7 +73,7 @@ function saveConfig (body) {
 }
 
 try {
-    var hardwareConfig = fs.readFileSync('./hardware.json');
+    var hardwareConfig = fs.readFileSync(path.hardwareConfig());
     hardwareConfig = JSON.parse(hardwareConfig);
 }
 catch (err) {
@@ -80,7 +81,7 @@ catch (err) {
     console.error(err);
 } 
 
-var config = fs.readFileSync('./config.json');
+var config = fs.readFileSync(path.userConfig());
 try {
     config = JSON.parse(config);
     console.log("User configuration parsed");

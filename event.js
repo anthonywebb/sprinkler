@@ -42,6 +42,9 @@
 //   syslog              Enable (true) or disable (false) recording of events
 //                       through syslog.
 //
+
+var path = require('./path');
+
 var syslog = null;
 try {
    syslog = require('node-syslog');
@@ -55,7 +58,7 @@ var syslog_enabled = false;
 
 // load up the database
 var nedb = require('nedb'); 
-var db = new nedb({ filename: './database', autoload: true });
+var db = new nedb({ filename: path.events(), autoload: true });
 
 exports.configure = function (config) {
 
