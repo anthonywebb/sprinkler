@@ -1,0 +1,31 @@
+#!/bin/sh
+#
+# Export all available GPIO pins on a Raspberry Pi board.
+
+# The gpio number order used here is a bit peculiar but matches
+# the following order of the P1 connector pins:
+# - all pins on the left side, in increasing P1 pin number (7, 11, 13, 15).
+# - all pins on the right side, in increasing P1 pin number (12, 16, 18, 22).
+#
+for i in 4 17 27 22 18 23 24 25
+do
+    echo $i > /sys/class/gpio/export
+done
+
+# Raspbian timing issue: changing permissions to allow access to the gpio
+# group seems to take some time in 2014-01-07-wheezy (background process?).
+#
+sleep 0.5
+for i in 4 17 27 22 18 23 24 25
+do
+    echo out > /sys/class/gpio/gpio$i/direction
+done
+
+# The SainSmart relay board (and clones) are active low. Set all pins
+# to high to avoid activating all relays at once.
+#
+for i in 4 17 27 22 18 23 24 25
+do
+    echo 1 > /sys/class/gpio/gpio$i/value
+done
+

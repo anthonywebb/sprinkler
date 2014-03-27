@@ -25,6 +25,10 @@
 //   that is available on BeagleBone and Raspberry Pi (and probably others,
 //   since it only relies on /sys/class/gpio).
 //
+//   This module do some tricks to workaround a Raspbian issue: access to
+//   the gpio files is only granted after a short while, in the background.
+//   The application needs to try again if it failed.
+//
 // DESCRIPTION
 //
 //   var hardware = require('./hardware');
@@ -123,17 +127,22 @@ catch (err) {
 
 var piodb = new Object(); // Make sure it exists (simplify validation).
 
-// Raspbian bug: access to the gpio files is only granted
+// Raspbian issue: access to the gpio files is only granted
 // after a short while, in the background.
 // Need to try again if it failed.
 function retry(i) {
-   debuglog ('Setting up zone '+i+' failed, scheduling retry in 0.5 second');
+   debuglog ('Setting up zone '+i+' failed, scheduling retry in 0.2 second');
    setTimeout (function() {
       debuglog ('Retrying zone '+i);
-      piodb.zones[i].gpio = new gpio(piodb.zones[i].pin, 'out');
-      piodb.zones[i].ready = true;
-      exports.setZone(i, piodb.zones[i].on);
-   }, 500);
+      try {
+         piodb.zones[i].gpio = new gpio(piodb.zones[i].pin, 'out');
+         piodb.zones[i].ready = true; // No error was raised this time.
+         exports.setZone(i, piodb.zones[i].value);
+      }
+      catch (err) {
+         retry(i);
+      }
+   }, 200);
 }
 
 exports.configure = function (config, user) {
@@ -157,10 +166,12 @@ exports.configure = function (config, user) {
             // after a short while, in the background.
             // Need to try again if it failed.
             piodb.zones[i].ready = false;
+            piodb.zones[i].value = false;
             piodb.zones[i].pin = user.zones[i].pin;
             try {
                piodb.zones[i].gpio = new gpio(piodb.zones[i].pin, 'out');
-               piodb.zones[i].ready = true; // No error.
+               piodb.zones[i].ready = true; // No error was raised.
+               exports.setZone(i, piodb.zones[i].value);
             }
             catch (err) {
                retry(i);
@@ -185,7 +196,6 @@ exports.configure = function (config, user) {
                piodb.zones[i].off = 1;
             }
          }
-         piodb.zones[i].on = false;
       }
    }
 }
@@ -217,7 +227,7 @@ exports.setZone = function (zone, on) {
    if (! piodb.zones[zone].pin) {
       return null;
    }
-   piodb.zones[zone].on = on;
+   piodb.zones[zone].value = on;
    if (! piodb.zones[zone].ready) {
       return null; // This pin will be set later, when ready.
    }
