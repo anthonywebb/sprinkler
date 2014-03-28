@@ -32,6 +32,12 @@
 //      only if the last one was performed more than a defined interval
 //      (12 hours) ago, or if the configuration was changed.
 //
+//   calendar.status ();
+//
+//      Return the status of the latest calendar update. The status is an
+//      array of structures. Each structure contains the calendar name,
+//      a boolean status and an update time.
+//
 //   calendar.programs ();
 //
 //      Return the list of watering programs built from the last refresh.
@@ -81,6 +87,7 @@ var imported = new Object();
 imported.calendar = new Array();
 imported.programs = new Array();
 imported.received = null;
+imported.updated = null;
 
 var pendingCalendar = null;
 
@@ -415,6 +422,7 @@ ICalendar.prototype.import = function (text) {
 
    infoLog ('loaded '+imported.programs.length+' programs from '+pendingCalendar.name);
    pendingCalendar.status = 'ok';
+   pendingCalendar.updated = new Date();
    pendingCalendar = null;
    events = null;
    text = null;
@@ -586,6 +594,20 @@ exports.refresh = function () {
    lastUpdate = time;
 
    loadNextCalendar();
+}
+
+// --------------------------------------------------------------------------
+// Method for calendar status.
+exports.status = function () {
+
+   var result = new Array();
+   for (var i = 0; i < imported.calendar.length; i++) {
+      result[i] = new Object();
+      result[i].name = imported.calendar[i].name;
+      result[i].status = (imported.calendar[i].status == 'ok');
+      result[i].updated = imported.calendar[i].updated;
+   }
+   return result;
 }
 
 // --------------------------------------------------------------------------

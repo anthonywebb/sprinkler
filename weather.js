@@ -37,6 +37,16 @@
 //      executed if the last one was performed less than a defined
 //      interval (6 hours).
 //
+//   weather.status ();
+//
+//      Return the latest status of the weather data service: true if
+//      an update was successfully completed on the last attempt, false
+//      otherwise.
+//
+//   weather.updated ();
+//
+//      Return the time of the latest successful weather data update.
+//
 //   weather.temperature ();
 //
 //      return the average temperature for the previous day.
@@ -146,6 +156,7 @@ function getWeather () {
       res.on('end', function(d) {
          weatherConditions = JSON.parse(received);
          received = null;
+         weatherConditions.updated = new Date();
          console.log ('Weather: received update');
       });
    });
@@ -162,6 +173,20 @@ exports.refresh = function () {
    if (url) {
       getWeather();
    }
+}
+
+exports.status = function () {
+   if (weatherConditions) {
+      return true;
+   }
+   return false;
+}
+
+exports.updated = function () {
+   if (weatherConditions) {
+      return weatherConditions.updated;
+   }
+   return {};
 }
 
 exports.temperature = function () {

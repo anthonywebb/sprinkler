@@ -125,9 +125,9 @@ app.post('/config', function(req, res){
 app.get('/status', function(req, res){
     var now = new Date().getTime();
     if ((config.raindelay) && (now < rainTimer)) {
-       res.json({status:'ok',weatherenable:config.weather.enable,raintimer:new Date(rainTimer),raindelay:config.raindelay,running:running,queue:runqueue});
+       res.json({status:'ok',weather:{enable:config.weather.enable,status:weather.status(),updated:weather.updated()},calendars:calendar.status(),raintimer:new Date(rainTimer),raindelay:config.raindelay,running:running,queue:runqueue});
     } else {
-       res.json({status:'ok',weatherenable:config.weather.enable,raindelay:config.raindelay,running:running,queue:runqueue});
+       res.json({status:'ok',weather:{enable:config.weather.enable,status:weather.status(),updated:weather.updated()},calendars:calendar.status(),raindelay:config.raindelay,running:running,queue:runqueue});
     }
 });
 
