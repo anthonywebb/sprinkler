@@ -298,6 +298,14 @@ app.get('/calendar/programs', function(req, res){
     res.json(calendar.programs());
 });
 
+app.get('/weather', function(req, res){
+    if (weather.status()) {
+        res.json({status:'ok',temperature:weather.temperature(),humidity:weather.humidity(),rain:weather.rain(),rainsensor:weather.rainsensor(),adjustment:weather.adjust(100)});
+    } else {
+        res.json({status:'ok'});    
+    }
+});
+
 app.get('/hardware/info', function(req, res){
     res.json(hardware.info());
 });
