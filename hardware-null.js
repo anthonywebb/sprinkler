@@ -26,7 +26,7 @@
 //
 //   var hardware = require('./hardware');
 //
-//   hardware.configure (hardwareConfig, userConfig);
+//   hardware.configure (hardwareConfig, userConfig, options);
 //
 //      Initialize the hardware module from the configuration.
 //      This method can be called as often as necessary (typically
@@ -87,11 +87,16 @@
 
 var piodb = null;
 
-function debuglog (text) {
-   console.log ('Hardware: '+text);
+var debugLog = function (text) {}
+
+function verboseLog (text) {
+   console.log ('[DEBUG] Hardware(null): '+text);
 }
 
-exports.configure = function (config, user) {
+exports.configure = function (config, user, options) {
+   if (options && options.debug) {
+      debugLog = verboseLog;
+   }
    piodb = new Object();
 
    var zonecount = user.zones.length;
@@ -99,7 +104,7 @@ exports.configure = function (config, user) {
    for(var i = 0; i < zonecount; i++) {
       piodb.zones[i] = new Object();
       piodb.zones[i].name = user.zones[i].name;
-      debuglog ('configuring zone '+piodb.zones[i].name+' (#'+i+')');
+      debugLog ('configuring zone '+piodb.zones[i].name+' (#'+i+')');
    }
 }
 
@@ -128,13 +133,13 @@ exports.setZone = function (zone, on) {
       return null;
    }
    if (on) {
-      debuglog ('zone '+piodb.zones[zone].name+' (#'+zone+') set to on');
+      debugLog ('zone '+piodb.zones[zone].name+' (#'+zone+') set to on');
    } else {
-      debuglog ('zone '+piodb.zones[zone].name+' (#'+zone+') set to off');
+      debugLog ('zone '+piodb.zones[zone].name+' (#'+zone+') set to off');
    }
 }
 
 exports.apply = function () {
-   debuglog ('apply');
+   debugLog ('apply');
 }
 

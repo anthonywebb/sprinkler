@@ -33,7 +33,7 @@
 //
 //   var hardware = require('./hardware');
 //
-//   hardware.configure (hardwareConfig, userConfig);
+//   hardware.configure (hardwareConfig, userConfig, options);
 //
 //      Initialize the hardware module from the configuration.
 //      This method can be called as often as necessary (typically
@@ -109,19 +109,21 @@
 //                       the output pin for each zone.
 //
 
-function debuglog (text) {
-   console.log ('Hardware(relays): '+text);
+var debugLog = function (text) {}
+
+function verboseLog (text) {
+   console.log ('[DEBUG] Hardware(relays): '+text);
 }
 
-function errorlog (text) {
-   console.error ('Hardware(relays): '+text);
+function errorLog (text) {
+   console.error ('[ERROR] Hardware(relays): '+text);
 }
 
 try {
    var gpio = require('onoff').Gpio;
 }
 catch (err) {
-   errorlog ('cannot access module onoff');
+   errorLog ('cannot access module onoff');
    var gpio = null;
 }
 
@@ -131,9 +133,9 @@ var piodb = new Object(); // Make sure it exists (simplify validation).
 // after a short while, in the background.
 // Need to try again if it failed.
 function retry(i) {
-   debuglog ('Setting up zone '+i+' failed, scheduling retry in 0.2 second');
+   debugLog ('Setting up zone '+i+' failed, scheduling retry in 0.2 second');
    setTimeout (function() {
-      debuglog ('Retrying zone '+i);
+      debugLog ('Retrying zone '+i);
       try {
          piodb.zones[i].gpio = new gpio(piodb.zones[i].pin, 'out');
          piodb.zones[i].ready = true; // No error was raised this time.
@@ -145,9 +147,12 @@ function retry(i) {
    }, 200);
 }
 
-exports.configure = function (config, user) {
+exports.configure = function (config, user, options) {
+   if (options && options.debug) {
+      debugLog = verboseLog;
+   }
    if ((! gpio) || (! user.production)) {
-      debuglog ('using debug GPIO traces');
+      debugLog ('using debug GPIO traces');
       gpio = null;
    }
 
@@ -233,7 +238,7 @@ exports.setZone = function (zone, on) {
    if (! piodb.zones[zone].ready) {
       return null; // This pin will be set later, when ready.
    }
-   debuglog ('GPIO '+piodb.zones[zone].pin+' set to '+on);
+   debugLog ('GPIO '+piodb.zones[zone].pin+' set to '+on);
    if (gpio) {
       if (on) {
          piodb.zones[zone].gpio.writeSync(piodb.zones[zone].on);
@@ -242,9 +247,9 @@ exports.setZone = function (zone, on) {
       }
    } else {
       if (on) {
-         debuglog ('GPIO '+piodb.zones[zone].pin+' set to on ('+piodb.zones[zone].on+')');
+         debugLog ('GPIO '+piodb.zones[zone].pin+' set to on ('+piodb.zones[zone].on+')');
       } else {
-         debuglog ('GPIO '+piodb.zones[zone].pin+' set to off ('+piodb.zones[zone].off+')');
+         debugLog ('GPIO '+piodb.zones[zone].pin+' set to off ('+piodb.zones[zone].off+')');
       }
    }
 }

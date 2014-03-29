@@ -25,7 +25,7 @@
 //
 //   var weather = require('./weather');
 //
-//   weather.configure (config);
+//   weather.configure (config, options);
 //
 //      Initialize the weather module from the user configuration.
 //      This method can be called as often as necessary (typically
@@ -103,6 +103,12 @@ var maxadjust = 150;
 var raintrigger = null;
 var webRequest = null;
 
+var debugLog = function (text) {}
+
+function verboseLog (text) {
+   console.log ('[DEBUG] Weather: '+text);
+}
+
 function restoreDefaults () {
 
    url = null;
@@ -113,8 +119,11 @@ function restoreDefaults () {
 }
 restoreDefaults();
 
-exports.configure = function (config) {
+exports.configure = function (config, options) {
 
+   if (options && options.debug) {
+      debugLog = verboseLog;
+   }
    restoreDefaults();
 
    if (! config.weather) return;
@@ -146,7 +155,7 @@ function getWeather () {
    if (time < lastUpdate + updateInterval) return;
    lastUpdate = time;
 
-   console.log ('Weather: checking for update..');
+   debugLog ('checking for update..');
    received = "";
 
    webRequest = http.request(url, function(res) {
@@ -157,7 +166,7 @@ function getWeather () {
          weatherConditions = JSON.parse(received);
          received = null;
          weatherConditions.updated = new Date();
-         console.log ('Weather: received update');
+         debugLog ('received update');
       });
    });
    webRequest.on('error', function(e) {
@@ -237,13 +246,6 @@ function adjustment () {
    var meantempi = history.meantempi - 0;
    var precipi = history.precipi - 0;
    var precip_today_in = current.precip_today_in - 0;
-
-   // console.log ("Weather: current adjustment");
-   // console.log ("Weather: history.maxhumidity = "+history.maxhumidity);
-   // console.log ("Weather: history.minhumidity = "+history.minhumidity);
-   // console.log ("Weather: history.meantempi = "+history.meantempi);
-   // console.log ("Weather: history.precipi = "+history.precipi);
-   // console.log ("Weather: current.precip_today_in = "+current.precip_today_in);
 
    var humid_factor = 30 - ((maxhumidity + minhumidity) / 2);
    var temp_factor = (meantempi - 70) * 4;

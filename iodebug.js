@@ -25,8 +25,8 @@
 
 var piodb = null;
 
-function debuglog (text) {
-   console.log ('**iodebug: '+text);
+function debugLog (text) {
+   console.log ('[DEBUG] Iodebug: '+text);
 }
 
 exports.LOW = 0;
@@ -51,19 +51,19 @@ function constant2string (value) {
 }
 
 exports.pinMode = function (pin, mode) {
-   debuglog ('pinMode ('+pin+', '+constant2string(mode)+')');
+   debugLog ('pinMode ('+pin+', '+constant2string(mode)+')');
 }
 
 exports.digitalWrite = function (pin, value) {
-   debuglog ('digitalWrite ('+pin+', '+constant2string(value)+')');
+   debugLog ('digitalWrite ('+pin+', '+constant2string(value)+')');
 }
 
 exports.digitalRead = function (pin) {
-   //debuglog ('digitalRead ('+pin+')');
+   //debugLog ('digitalRead ('+pin+')');
    return 0;
 }
 
 exports.attachInterrupt = function (pin, flag, edge, callback) {
-   debuglog ('attachInterrupt ('+pin+', '+flag+', '+constant2string(edge)+', '+callback+')');
+   debugLog ('attachInterrupt ('+pin+', '+flag+', '+constant2string(edge)+', '+callback+')');
 }
 

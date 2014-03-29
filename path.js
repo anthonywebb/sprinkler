@@ -24,6 +24,10 @@
 //
 //   var path = require('./path');
 //
+//   path.configure(options);
+//
+//       Take the command line options into consideration.
+//
 //   path.userConfig();
 //
 //       Return a full path name for the user configuration file.
@@ -39,22 +43,30 @@
 
 var fs = require('graceful-fs');
 
-function debuglog (text) {
-   console.log ('Path: '+text);
+var debugLog = function (text) {}
+
+function verboseLog (text) {
+   console.log ('[DEBUG] Path: '+text);
 }
 
 function searchFile (name) {
-   debuglog ('searching for '+name+' ..');
+   debugLog ('searching for '+name+' ..');
    if (fs.existsSync('./'+name)) {
-      debuglog ('found local file ./'+name);
+      debugLog ('found local file ./'+name);
       return './'+name;
    }
    if (fs.existsSync('/var/lib/sprinkler')) {
-      debuglog ('using file /var/lib/sprinkler/'+name);
+      debugLog ('using file /var/lib/sprinkler/'+name);
       return '/var/lib/sprinkler/'+name;
    }
-   debuglog ('defaulting to local file ./'+name);
+   debugLog ('defaulting to local file ./'+name);
    return './'+name;
+}
+
+exports.configure = function (options) {
+   if (options && options.debug) {
+      debugLog = verboseLog;
+   }
 }
 
 exports.userConfig = function () {

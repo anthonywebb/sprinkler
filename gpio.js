@@ -38,12 +38,12 @@
 //   (None.)
 //
 
-function debuglog (text) {
-   console.log ('gpio: '+text);
+function debugLog (text) {
+   console.log ('[DEBUG] Gpio: '+text);
 }
 
-function errorlog (text) {
-   console.error ('gpio: '+text);
+function errorLog (text) {
+   console.error ('[ERROR] Gpio: '+text);
 }
 
 var gpio = null;
@@ -51,7 +51,7 @@ try {
    gpio = require('onoff').Gpio;
 }
 catch (err) {
-   errorlog ('cannot access module onoff, using simulation mode');
+   errorLog ('cannot access module onoff, using simulation mode');
 }
 
 
@@ -87,9 +87,9 @@ function writePin(value) {
 // while, in the background. Need to try again if it failed.
 //
 function retry() {
-   debuglog ('Failed to setup pin '+this.pin+', retrying in 0.2 second');
+   debugLog ('Failed to setup pin '+this.pin+', retrying in 0.2 second');
    setTimeout (function() {
-      debuglog ('Retrying pin '+this.pin);
+      debugLog ('Retrying pin '+this.pin);
       try {
          setupPin();
       }

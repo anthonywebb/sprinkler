@@ -20,7 +20,7 @@
 //
 //   var calendar = require('./calendar');
 //
-//   calendar.configure (config);
+//   calendar.configure (config, options);
 //
 //      Initialize the calendar module from the user configuration.
 //      This method can be called as often as necessary (typically
@@ -67,15 +67,17 @@ var http = require('http');
 var https = require('https');
 
 function errorLog (text) {
-   console.error('Calendar: '+text);
+   console.error('[ERROR] Calendar: '+text);
 }
 
 function infoLog (text) {
-   console.log('Calendar: '+text);
+   console.log('[INFO] Calendar: '+text);
 }
 
-function debugLog (text) {
-   // console.log('Calendar: '+text);
+var debugLog = function (text) {}
+
+function verboseLog (text) {
+   console.log('[DEBUG] Calendar: '+text);
 }
 
 function UnsupportedCalendar (format) {
@@ -101,8 +103,11 @@ var webRequest = null;
 // (The difference is that we maintain the status for each source in the DB,
 // which status we do not want to see reflected in the config saved to disk.)
 //
-exports.configure = function (config) {
+exports.configure = function (config, options) {
 
+   if (options && options.debug) {
+      debugLog = verboseLog;
+   }
    debugLog ("analyzing calendar sources in configuration");
 
    buildZoneIndex(config);

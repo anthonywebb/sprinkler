@@ -27,7 +27,7 @@
 //
 //   var hardware = require('./hardware');
 //
-//   hardware.configure (hardwareConfig, userConfig);
+//   hardware.configure (hardwareConfig, userConfig, options);
 //
 //      Initialize the hardware module from the configuration.
 //      This method can be called as often as necessary (typically
@@ -118,27 +118,32 @@
 //                       are present.
 //
 
-function debuglog (text) {
-   console.log ('Hardware(osbo): '+text);
+var debugLog = function (text) {}
+
+function verboseLog (text) {
+   console.log ('[DEBUG] Hardware(osbo): '+text);
 }
 
-function errorlog (text) {
-   console.error ('Hardware(osbo): '+text);
+function errorLog (text) {
+   console.error ('[ERROR] Hardware(osbo): '+text);
 }
 
 try {
    var io = require('bonescript');
 }
 catch (err) {
-   errorlog ('cannot access module bonescript');
+   errorLog ('cannot access module bonescript');
    var io = null;
 }
 
 var piodb = new Object(); // Make sure it exists (simplify validation).
 
-exports.configure = function (config, user) {
+exports.configure = function (config, user, options) {
+   if (options && options.debug) {
+      debugLog = verboseLog;
+   }
    if ((! io) || (! user.production)) {
-      debuglog ('using debug I/O module');
+      debugLog ('using debug I/O module');
       io = require('./iodebug');
    }
    piodb = new Object();
@@ -237,7 +242,7 @@ exports.setZone = function (zone, on) {
       value = io.LOW;
    }
    if (piodb.zones[zone].value != value) {
-      debuglog ('Zone '+zone+' set to '+value);
+      debugLog ('Zone '+zone+' set to '+value);
       piodb.zones[zone].value = value;
       piodb.changed = true;
    }

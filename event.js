@@ -19,7 +19,7 @@
 //
 //   var event = require('./event');
 //
-//   event.configure (config);
+//   event.configure (config, options);
 //
 //      Initialize the event module from the configuration.
 //      This method can be called as often as necessary (typically
@@ -45,13 +45,17 @@
 
 var path = require('./path');
 
+function errorLog (text) {
+   console.error ('[ERROR] Event: '+text);
+}
+
 var syslog = null;
 try {
    syslog = require('node-syslog');
    syslog.init("sprinkler", syslog.LOG_ODELAY, syslog.LOG_USER);
 }
 catch (err) {
-   console.error ('cannot initialize node-syslog');
+   errorLog ('cannot initialize node-syslog');
 }
 
 var syslog_enabled = false;
@@ -60,7 +64,7 @@ var syslog_enabled = false;
 var nedb = require('nedb'); 
 var db = new nedb({ filename: path.events(), autoload: true });
 
-exports.configure = function (config) {
+exports.configure = function (config, options) {
 
    if (config.syslog) {
       if (syslog) {
@@ -73,7 +77,7 @@ exports.record = function (data) {
    data.timestamp = new Date();
    db.insert(data, function (err, newDoc) {
       if(err){
-         console.error('Database insert error: '+err);
+         errorLog('Database insert error: '+err);
       }
    });    
    if (syslog_enabled) {
@@ -102,7 +106,7 @@ exports.find = function (filter, callback) {
    if (filter == null) filter = {};
    db.find(filter, function (err, docs) {
       if(err){
-         console.error(err);
+         errorLog('cannot use filter "'+filter+'": '+err);
          callback({status: 'error', msg:err.message});
       } else {
          // The history is sorted most recent first.

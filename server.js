@@ -25,6 +25,27 @@ var rainDelayInterval = 86340000; // 1 day - 1 minute.
 var rainTimer = 0;
 
 
+var errorLog = function (text) {
+    console.log ('[ERROR] '+text);
+}
+
+var options = new Object();
+
+process.argv.forEach(function(val, index, array) {
+    if (val == '--debug') {
+        options.debug = true;
+    }
+});
+
+var debugLog = function (text) {}
+
+if (options.debug) {
+    debugLog = function (text) {
+        console.log ('[DEBUG] '+text);
+    }
+}
+debugLog ('starting sprinkler');
+
 ///////////////////////////////////////
 // LOAD THE PROGRAM CONFIGURATION
 //////////////////////////////////////
@@ -47,12 +68,12 @@ function resetCounts() {
 
 function activateConfig () {
 
-    event.configure(config);
-    hardware.configure (hardwareConfig, config);
+    event.configure(config, options);
+    hardware.configure (hardwareConfig, config, options);
     hardware.rainInterrupt (rainCallback);
     hardware.buttonInterrupt (buttonCallback);
-    calendar.configure(config);
-    weather.configure(config);
+    calendar.configure(config, options);
+    weather.configure(config, options);
     // Calculate the real counts from the configuration we loaded.
     resetCounts();
 }
@@ -63,10 +84,10 @@ function saveConfig (body) {
 
     fs.writeFile(path.userConfig(), data, function (err) {
         if (err) {
-            console.error('failed to save configuration data: '+err.message);
+            errorLog('failed to save configuration data: '+err.message);
             return;
         }
-        console.log('Configuration saved successfully.');
+        debugLog('Configuration saved successfully.');
         config = body;
         activateConfig();
     });
@@ -77,20 +98,18 @@ try {
     hardwareConfig = JSON.parse(hardwareConfig);
 }
 catch (err) {
-    console.error('There has been an error loading or parsing the hardware config')
-    console.error(err);
+    errorLog('There has been an error loading or parsing the hardware config: '+err)
 } 
 
 var config = fs.readFileSync(path.userConfig());
 try {
     config = JSON.parse(config);
-    console.log("User configuration parsed");
+    debugLog("User configuration parsed");
 
     activateConfig();
 }
 catch (err) {
-    console.error('There has been an error parsing the user config')
-    console.error(err);
+    errorLog('There has been an error parsing the user config: '+err)
 } 
 
 if (!config.weather) {
@@ -115,7 +134,7 @@ app.get('/config', function(req, res){
 });
 
 app.post('/config', function(req, res){
-    //console.log(req.body);
+    //debugLog(req.body);
 
     saveConfig (req.body);
 
@@ -327,7 +346,7 @@ function schedulePrograms (programs, currTime, currDay, d) {
         // Now check if the program should start today.
         if (programs[i].days) {
             // Runs weekly, on specific days of the week.
-console.log ('Checking day for program '+programs[i].name+' (weekly)');
+            debugLog ('Checking day for program '+programs[i].name+' (weekly)');
             if(programs[i].days.indexOf(currDay) != -1){
                 programOn(programs[i]);
             }
@@ -340,14 +359,14 @@ console.log ('Checking day for program '+programs[i].name+' (weekly)');
 
         if (programs[i].interval) {
             // Runs daily, at some day interval.
-console.log ('Checking day for program '+programs[i].name+' (daily, interval='+programs[i].interval+', delta='+delta+')');
+            debugLog ('Checking day for program '+programs[i].name+' (daily, interval='+programs[i].interval+', delta='+delta+')');
             if ((delta % programs[i].interval) == 0) {
                 programOn(programs[i]);
             }
             continue;
         }
         // Otherwise, this program runs at the specified date (once).
-console.log ('Checking day for program '+programs[i].name+' (once, delta='+delta+')');
+        debugLog ('Checking day for program '+programs[i].name+' (once, delta='+delta+')');
         if (delta == 0) {
             programOn(programs[i]);
             programs[i].active = false; // Do not run it again.
@@ -398,7 +417,7 @@ function scheduler () {
 //////////////////////////////////////
 
 app.listen(config.webserver.port);
-console.log('Listening on port '+config.webserver.port);
+debugLog('Listening on port '+config.webserver.port);
 
 // turn off all zones
 killQueue();
@@ -444,7 +463,7 @@ setTimeout(function(){
 setInterval(function(){
     socket.send(message, 0, message.length, 41234, '255.255.255.255', function(err, bytes) {
         if(err){
-            console.error(err);
+            errorLog('cannot send periodic broadcast signature: '+err);
         }
     });
 },6000);
@@ -456,12 +475,12 @@ event.record({action: 'STARTUP'});
 //////////////////////////////////////
 
 function missingHandler(req, res, next) {
-    console.log('404 Not found - '+req.url);
+    errorLog('404 Not found - '+req.url);
     res.json(404, { status: 'error', msg: 'Not found, sorry...' });
 }
 
 function errorHandler(res, msg) {
-    console.log(msg);
+    errorLog(msg);
     res.json(500, { status: 'error', msg: msg });
 }
 
@@ -483,7 +502,7 @@ function zoneOn(index,seconds) {
 }
 
 function programOn(program) {
-    console.log ('Running program '+program.name);
+    debugLog ('Running program '+program.name);
     if ((!program.options) || (!program.options.append)) {
         killQueue();
     }
@@ -534,7 +553,7 @@ function programOn(program) {
 // Shut down all the zones and stop the current action.
 //
 function zonesOff() {
-    // console.log('shutting off all zones');
+    debugLog('shutting off all zones');
     
     // if we are currently running something, log that we interrupted it.
     if(running.seconds) {
@@ -552,7 +571,7 @@ function zonesOff() {
 }
 
 function killQueue() {
-    //console.log('clearing the queue');
+    debugLog('clearing the queue');
     zonesOff();
     runqueue = [];
     clearTimers();
@@ -572,7 +591,7 @@ function processQueue() {
 
         if ((running.zone == null) || (running.zone == undefined) || (running.zone < 0) || (running.zone >= zonecount)) {
             // Don't process an invalid program.
-            console.error('Invalid zone '+running.zone);
+            errorLog('Invalid zone '+running.zone);
             return;
         }
         event.record({action: 'START', zone:running.zone-0, parent: running.parent, seconds: running.seconds});
@@ -628,7 +647,7 @@ function processQueue() {
 
 function rainCallback(x) {
     if(x.output){
-        console.log('Raining! '+JSON.stringify(x));
+        debugLog('Raining! '+JSON.stringify(x));
         rainTimer = new Date().getTime() + rainDelayInterval;
     }
 }
@@ -643,17 +662,17 @@ function buttonCallback(x) {
         if (currOn<=zonecount){
             buttonTimer = setTimeout (function () {
                 var zone = currOn - 1;
-                console.log('Turning on zone '+zone);
+                debugLog('Turning on zone '+zone);
                 zoneOn(zone,900);
             }, 2000);
         }
         else {
-            console.log('All done, back to the start');
+            debugLog('All done, back to the start');
             currOn = 0;
         }
 
-        console.log('Button Pressed!');
-        console.log(JSON.stringify(x));   
+        debugLog('Button Pressed!');
+        debugLog(JSON.stringify(x));   
     }
 }
 
