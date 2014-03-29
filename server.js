@@ -483,13 +483,15 @@ function zoneOn(index,seconds) {
 }
 
 function programOn(program) {
-    killQueue();
     console.log ('Running program '+program.name);
+    if ((!program.options) || (!program.options.append)) {
+        killQueue();
+    }
 
     // We need to clone the list of zones because we remove each item from
     // the list of zones in the queue after it has run its course: without
     // cloning we would destroy the list of zones in the program itself.
-    runqueue = new Array();
+    //
     for (var i = 0; i < program.zones.length; i++) {
 
         // Add the capability to disable one zone, when activated from
@@ -502,21 +504,23 @@ function programOn(program) {
            continue;
         }
 
-        runqueue[i] = new Object();
-        runqueue[i].parent = program.name;
-        runqueue[i].zone = program.zones[i].zone;
-        runqueue[i].seconds = program.zones[i].seconds;
+        var zone = program.zones[i].zone;
+        var seconds = program.zones[i].seconds;
+
+        if (weather.status()) {
+            if (config.weather.enable) {
+                // Adjust the zone duration according to the weather.
+                // Note that we do not adjust a manual activation on
+                // a manual zone start: the user knows what he is doing.
+                //
+                seconds = weather.adjust(seconds);
+            }
+        }
+        runqueue.push({zone:zone,seconds:seconds,parent:program.name});
     }
 
     if (weather.status()) {
         if (config.weather.enable) {
-            // Adjust the program's zones duration according to the weather.
-            // Note that we do not adjust a manual activation on an individual
-            // zone: the user knows what he is doing.
-
-            for (var i = 0; i < runqueue.length; i++) {
-                runqueue[i].seconds = weather.adjust(runqueue[i].seconds);
-            }
             event.record({action: 'START', program: program.name, temperature: weather.temperature(), humidity: weather.humidity(), rain: weather.rain(), adjustment: weather.adjust(100)});
         } else {
             event.record({action: 'START', program: program.name, temperature: weather.temperature(), humidity: weather.humidity(), rain: weather.rain()});
