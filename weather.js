@@ -64,9 +64,9 @@
 //      return true if the current rain has reached the configured
 //      trigger level, false otherwise.
 //
-//   weather.adjustment ();
+//   weather.adjust (duration);
 //
-//      return the watering duration's weather adjustment.
+//      return the weather-adjusted watering duration.
 //
 // CONFIGURATION
 //
@@ -222,7 +222,7 @@ exports.rainsensor = function () {
 }
 
 // Adjustment formula derived from sprinklers_pi/weather.cpp
-exports.adjustment = function () {
+function adjustment () {
 
    if (weatherConditions == null) return 100;
 
@@ -249,9 +249,14 @@ exports.adjustment = function () {
    var temp_factor = (meantempi - 70) * 4;
    var rain_factor = 0.0 - ((precipi + precip_today_in) * 200.0);
 
-   var adjust =
-       Math.min(Math.max(minadjust, 100+humid_factor+temp_factor+rain_factor), maxadjust);
+   return 100+humid_factor+temp_factor+rain_factor;
+}
 
-   return adjust;
+exports.adjust = function (duration) {
+   if (weatherConditions == null) return duration;
+   var minadjusted = (duration * minadjust) / 100;
+   var maxadjusted = (duration * maxadjust) / 100;
+   var adjusted    = ((duration * adjustment()) + 50) / 100;
+   return Math.floor(Math.min(Math.max(minadjusted, adjusted), maxadjusted));
 }
 

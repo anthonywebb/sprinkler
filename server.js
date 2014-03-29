@@ -500,19 +500,22 @@ function programOn(program) {
         runqueue[i].seconds = program.zones[i].seconds;
     }
 
-    var adjustment = 100;
+    if (weather.status()) {
+        if (config.weather.enable) {
+            // Adjust the program's zones duration according to the weather.
+            // Note that we do not adjust a manual activation on an individual
+            // zone: the user knows what he is doing.
 
-    if (config.weather.enable) {
-        // Adjust the program's zones duration according to the weather.
-        // Note that we do not adjust a manual activation on an individual
-        // zone: the user knows what he is doing.
-        adjustment = weather.adjustment();
-
-        for (var i = 0; i < runqueue.length; i++) {
-             runqueue[i].seconds = (runqueue[i].seconds * adjustment) / 100;
+            for (var i = 0; i < runqueue.length; i++) {
+                runqueue[i].seconds = weather.adjust(runqueue[i].seconds);
+            }
+            event.record({action: 'START', program: program.name, temperature: weather.temperature(), humidity: weather.humidity(), rain: weather.rain(), adjustment: weather.adjust(100)});
+        } else {
+            event.record({action: 'START', program: program.name, temperature: weather.temperature(), humidity: weather.humidity(), rain: weather.rain()});
         }
+    } else {
+        event.record({action: 'START', program: program.name});
     }
-    event.record({action: 'START', program: program.name, temperature: weather.temperature(), humidity: weather.humidity(), rain: weather.rain(), adjustment: adjustment});
     processQueue();
 }
 
