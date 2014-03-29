@@ -161,24 +161,6 @@ exports.configure = function (config, user) {
       var zonecount = user.zones.length;
       for (var i = 0; i < zonecount; i++) {
          piodb.zones[i] = new Object();
-         if (gpio) {
-            // Raspbian bug: access to the gpio files is only granted
-            // after a short while, in the background.
-            // Need to try again if it failed.
-            piodb.zones[i].ready = false;
-            piodb.zones[i].value = false;
-            piodb.zones[i].pin = user.zones[i].pin;
-            try {
-               piodb.zones[i].gpio = new gpio(piodb.zones[i].pin, 'out');
-               piodb.zones[i].ready = true; // No error was raised.
-               exports.setZone(i, piodb.zones[i].value);
-            }
-            catch (err) {
-               retry(i);
-            }
-         } else {
-            piodb.zones[i].pin = user.zones[i].pin;
-         }
 
          piodb.zones[i].on = 0;
          piodb.zones[i].off = 1;
@@ -195,6 +177,26 @@ exports.configure = function (config, user) {
                piodb.zones[i].on = 0;
                piodb.zones[i].off = 1;
             }
+         }
+
+         piodb.zones[i].ready = false;
+         piodb.zones[i].value = false;
+         piodb.zones[i].pin = user.zones[i].pin;
+
+         if (gpio) {
+            // Raspbian bug: access to the gpio files is only granted
+            // after a short while, in the background.
+            // Need to try again if it failed.
+            try {
+               piodb.zones[i].gpio = new gpio(piodb.zones[i].pin, 'out');
+               piodb.zones[i].ready = true; // No error was raised.
+               exports.setZone(i, piodb.zones[i].value);
+            }
+            catch (err) {
+               retry(i);
+            }
+         } else {
+            piodb.zones[i].ready = true;
          }
       }
    }
