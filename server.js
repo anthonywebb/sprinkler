@@ -294,6 +294,10 @@ app.get('/program/:id/on', function(req, res){
     }
 });
 
+app.get('/calendar/programs', function(req, res){
+    res.json(calendar.programs());
+});
+
 app.get('/hardware/info', function(req, res){
     res.json(hardware.info());
 });
