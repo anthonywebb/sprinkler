@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script>
+window.onload = function() {
+
+    function getZones (callback) {
+       var command = new XMLHttpRequest();
+       command.open("GET", "/config");
+       command.onreadystatechange = function () {
+          if (command.readyState === 4 && command.status === 200) {
+             var type = command.getResponseHeader("Content-Type");
+             if (type === "application/json")
+                callback((JSON.parse(command.responseText)).zones);
+             else
+                callback((JSON.parse(command.responseText)).zones);
+          }
+       }
+
+       command.send(null);
+    }
+
+    function zoneClick () {
+       var command = new XMLHttpRequest();
+       command.open("GET", "/zone/"+this.zoneindex+"/on/60");
+       command.send(null);
+    }
+
+    getZones (function (zones) {
+       var outer = document.createElement("div");
+       var menu = document.createElement("menu");
+       for (var i = 0; i < zones.length; i++) {
+          var inner = document.createElement("div");
+          var button = document.createElement("button");
+          button.zoneindex = i;
+          button.onclick = zoneClick;
+          button.innerHTML = zones[i].name;
+          inner.appendChild(button);
+          menu.appendChild(inner);
+       }
+       outer.appendChild(menu);
+       document.body.appendChild(outer);
+    });
+};
+</script>
+<body>
+</body>
+</html>
+
