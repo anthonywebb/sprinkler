@@ -44,9 +44,11 @@ window.onload = function() {
                action = 'START';
                if (event.program != null) {
                   item = 'PROGRAM '+event.program;
-                  description = ''+event.temperature+' F, '+event.humidity+'%';
+                  description = 'WEATHER '+event.temperature+' F, '+event.humidity+'%';
+                  if (event.adjustment != null)
+                     description = description+', ADJUST '+event.adjustment+'%';
                   if (event.rain)
-                     description = description+', raining';
+                     description = description+', RAINING';
                } else if (event.zone != null) {
                   item = 'ZONE '+zones[event.zone].name;
                   description = 'FOR '+event.seconds+'s, ';
@@ -97,10 +99,10 @@ window.onload = function() {
             column.innerHTML = timestamp.toLocaleString();
             row.appendChild(column);
             column = document.createElement("td");
-            column.innerHTML = action;
+            column.innerHTML = item;
             row.appendChild(column);
             column = document.createElement("td");
-            column.innerHTML = item;
+            column.innerHTML = action;
             row.appendChild(column);
             column = document.createElement("td");
             column.innerHTML = description;
@@ -113,7 +115,7 @@ window.onload = function() {
 </script>
 <body>
    <table border="0">
-      <tr bgcolor="green"><td width="20%">Time</td><td width="7%">Action</td><td width="14%">Object</td><td width="59%">Description</td></tr>
+      <tr bgcolor="green"><td width="25%">Time</td><td width="25%">Object</td><td width="5%">Action</td><td width="45%">Description</td></tr>
    </table>
 </body>
 </html>
