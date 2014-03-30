@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script>
+window.onload = function() {
+
+   function getZones (callback) {
+      var command = new XMLHttpRequest();
+      command.open("GET", "/config");
+      command.onreadystatechange = function () {
+         if (command.readyState === 4 && command.status === 200) {
+            var type = command.getResponseHeader("Content-Type");
+            callback((JSON.parse(command.responseText)).zones);
+         }
+      }
+
+      command.send(null);
+   }
+
+   function getHistory (zones, callback) {
+      var command = new XMLHttpRequest();
+      command.open("GET", "/history");
+      command.onreadystatechange = function () {
+         if (command.readyState === 4 && command.status === 200) {
+            var type = command.getResponseHeader("Content-Type");
+            callback(zones, (JSON.parse(command.responseText)).history);
+         }
+      }
+      command.send(null);
+   }
+
+   getZones (function (zones) {
+
+      getHistory (zones, function (zones, history) {
+         var table = document.getElementsByTagName ('table')[0];
+         for (var i = 0; i < history.length; i++) {
+            var event = history[i];
+            var timestamp = new Date(event.timestamp);
+            var action = '';
+            var item = '';
+            var description = '';
+            switch(event.action) {
+            case 'START':
+               action = 'START';
+               if (event.program) {
+                  item = 'PROGRAM '+event.program;
+                  description = ''+event.temperature+' F, '+event.humidity+'%';
+                  if (event.rain)
+                     description = description+', raining';
+               } else if (event.zone) {
+                  item = 'ZONE '+zones[event.zone].name;
+                  description = 'FOR '+event.seconds+'s, ';
+                  if (event.parent)
+                     description += 'IN PROGRAM '+event.parent;
+                  else
+                     description += 'MANUAL';
+               }
+               break;
+            case 'END':
+               action = 'END';
+               if (event.program) {
+                  item = 'PROGRAM '+event.program;
+               } else if (event.zone) {
+                  item = 'ZONE '+zones[event.zone].name;
+                  description = 'AFTER '+event.runtime+'s, ';
+                  if (event.parent)
+                     description += 'IN PROGRAM '+event.parent;
+                  else
+                     description += 'MANUAL';
+               }
+               break;
+            case 'CANCEL':
+               action = 'CANCEL';
+               item = 'ZONE '+zones[event.zone].name;
+               description = 'AFTER '+event.runtime+'s, ';
+               if (event.parent)
+                  description += 'IN PROGRAM '+event.parent;
+               else
+                  description += 'MANUAL';
+               break;
+            case 'SKIP':
+               action = 'SKIP';
+               item = 'ZONE '+zones[event.zone].name;
+               description = 'IN PROGRAM '+event.parent;
+               break;
+            case 'STARTUP':
+               action = 'START';
+               item = 'SYSTEM';
+               break;
+            case 'IDLE':
+               action = 'IDLE';
+               item = 'SYSTEM';
+               break;
+            }
+            var row = document.createElement("tr");
+            var column = document.createElement("td");
+            column.innerHTML = timestamp.toLocaleString();
+            row.appendChild(column);
+            column = document.createElement("td");
+            column.innerHTML = action;
+            row.appendChild(column);
+            column = document.createElement("td");
+            column.innerHTML = item;
+            row.appendChild(column);
+            column = document.createElement("td");
+            column.innerHTML = description;
+            row.appendChild(column);
+            table.appendChild(row);
+         }
+      });
+   });
+}
+</script>
+<body>
+   <table border="0">
+      <tr bgcolor="green"><td width="20%">Time</td><td width="7%">Action</td><td width="14%">Object</td><td width="59%">Description</td></tr>
+   </table>
+</body>
+</html>
+
