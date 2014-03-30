@@ -1,3 +1,4 @@
+var os = require('os');
 var fs = require('graceful-fs');
 var dgram = require('dgram');
 var express = require('express');
@@ -144,26 +145,26 @@ app.post('/config', function(req, res){
 app.get('/status', function(req, res){
     var now = new Date().getTime();
     if ((config.raindelay) && (now < rainTimer)) {
-       res.json({status:'ok',weather:{enable:config.weather.enable,status:weather.status(),updated:weather.updated()},calendars:calendar.status(),raintimer:new Date(rainTimer),raindelay:config.raindelay,running:running,queue:runqueue});
+       res.json({status:'ok',hostname:os.hostname(),weather:{enable:config.weather.enable,status:weather.status(),updated:weather.updated()},calendars:calendar.status(),raintimer:new Date(rainTimer),raindelay:config.raindelay,running:running,queue:runqueue});
     } else {
-       res.json({status:'ok',weather:{enable:config.weather.enable,status:weather.status(),updated:weather.updated()},calendars:calendar.status(),raindelay:config.raindelay,running:running,queue:runqueue});
+       res.json({status:'ok',hostname:os.hostname(),weather:{enable:config.weather.enable,status:weather.status(),updated:weather.updated()},calendars:calendar.status(),raindelay:config.raindelay,running:running,queue:runqueue});
     }
 });
 
 app.get('/off', function(req, res){
     killQueue();
-    res.json({status:'ok',msg:'all zones have been turned off'});
+    res.json({status:'ok',hostname:os.hostname(),msg:'all zones have been turned off'});
 });
 
 // This URL is to simulate the physical button.
 app.get('/button', function(req, res){
     buttonCallback({output: true});
     if (currOn == 0) {
-        res.json({status:'ok',msg:'No zone turned on'});
+        res.json({status:'ok',hostname:os.hostname(),msg:'No zone turned on'});
     }
     else {
         var zone = currOn - 1;
-        res.json({status:'ok',msg:'Current zone is '+zone});
+        res.json({status:'ok',hostname:os.hostname(),msg:'Current zone is '+config.zones[zone].name+' ('+zone+')'});
     }
 });
 
@@ -182,7 +183,7 @@ app.get('/raindelay', function(req, res){
         rainTimer = rainTimer + rainDelayInterval;
     }
     var until = new Date(rainTimer);
-    res.json({status:'ok',msg:'Programs delayed until '+until.getDate()+'/'+(until.getMonth()+1)+'/'+until.getFullYear()});
+    res.json({status:'ok',hostname:os.hostname(),msg:'Programs delayed until '+until.getDate()+'/'+(until.getMonth()+1)+'/'+until.getFullYear()});
 });
 
 // This URL is a way to enable/disable the rain delay feature.
@@ -190,11 +191,11 @@ app.get('/raindelay/:flag', function(req, res){
     var old = config.raindelay;
     if (req.params.flag == 'true') {
         config.raindelay = true;
-        res.json({status:'ok',msg:'Rain delay enabled'});
+        res.json({status:'ok',hostname:os.hostname(),msg:'Rain delay enabled'});
     } else {
         config.raindelay = false;
         rainTimer = 0;
-        res.json({status:'ok',msg:'Rain delay disabled'});
+        res.json({status:'ok',hostname:os.hostname(),msg:'Rain delay disabled'});
     }
     if (old != config.raindelay) {
         saveConfig (config);
@@ -206,10 +207,10 @@ app.get('/weather/:flag', function(req, res){
     var old = config.weather.enable;
     if (req.params.flag == 'true') {
         config.weather.enable = true;
-        res.json({status:'ok',msg:'Weather adjustment enabled'});
+        res.json({status:'ok',hostname:os.hostname(),msg:'Weather adjustment enabled'});
     } else {
         config.weather.enable = false;
-        res.json({status:'ok',msg:'Weather adjustment disabled'});
+        res.json({status:'ok',hostname:os.hostname(),msg:'Weather adjustment disabled'});
     }
     if (old != config.weather.enable) {
         saveConfig (config);
@@ -218,12 +219,13 @@ app.get('/weather/:flag', function(req, res){
 
 app.get('/refresh', function(req, res){
     activateConfig();
-    res.json({status:'ok',msg:'Refresh initiated'});
+    res.json({status:'ok',hostname:os.hostname(),msg:'Refresh initiated'});
 });
 
 app.get('/history', function(req, res){
     // Finding all the history for all zones
     event.find({}, function (response) {
+        response.hostname = os.hostname();
         res.json(response);
     });
 });
@@ -231,6 +233,7 @@ app.get('/history', function(req, res){
 app.get('/system/history', function(req, res){
     // Finding all the system events
     event.find({action: {$nin:['START', 'END', 'CANCEL']}}, function (response) {
+        response.hostname = os.hostname();
         res.json(response);
     });
 });
@@ -264,7 +267,8 @@ app.get('/program/:id/history', function(req, res){
     var program = retrieveProgramById (req.params.id);
     if (program) {
        event.find({program: program.name}, function (response) {
-        res.json(response);
+          response.hostname = os.hostname();
+          res.json(response);
        });
     }
     else {
@@ -277,7 +281,8 @@ app.get('/program/:id/full/history', function(req, res){
     var program = retrieveProgramById (req.params.id);
     if (program) {
        event.find({$or:[{program:program.name}, {parent:program.name}]}, function (response) {
-        res.json(response);
+          response.hostname = os.hostname();
+          res.json(response);
        });
     }
     else {
@@ -288,6 +293,7 @@ app.get('/program/:id/full/history', function(req, res){
 app.get('/zone/:id/history', function(req, res){
     // Finding all the history for this zone
     event.find({ zone: parseInt(req.params.id) }, function (response) {
+        response.hostname = os.hostname();
         res.json(response);
     });
 });
@@ -295,7 +301,7 @@ app.get('/zone/:id/history', function(req, res){
 app.get('/zone/:id/on/:seconds', function(req, res){
     if(req.params.id>=0 && req.params.id<zonecount){
         zoneOn(req.params.id,req.params.seconds);
-        res.json({status:'ok',msg:'started zone: '+config.zones[req.params.id].name});    
+        res.json({status:'ok',hostname:os.hostname(),msg:'started zone: '+config.zones[req.params.id].name});    
     }
     else {
         errorHandler(res,''+req.params.id+' is not a valid zone')
@@ -306,7 +312,7 @@ app.get('/program/:id/on', function(req, res){
     var program = retrieveProgramById (req.params.id);
     if (program) {
         programOn(program);
-        res.json({status:'ok',msg:'started program: '+program.name});    
+        res.json({status:'ok',hostname:os.hostname(),msg:'started program: '+program.name});    
     }
     else {
         errorHandler(res,''+req.params.id+' is not a valid program');
@@ -319,7 +325,7 @@ app.get('/calendar/programs', function(req, res){
 
 app.get('/weather', function(req, res){
     if (weather.status()) {
-        res.json({status:'ok',temperature:weather.temperature(),humidity:weather.humidity(),rain:weather.rain(),rainsensor:weather.rainsensor(),adjustment:weather.adjust(100)});
+        res.json({status:'ok',hostname:os.hostname(),temperature:weather.temperature(),humidity:weather.humidity(),rain:weather.rain(),rainsensor:weather.rainsensor(),adjustment:weather.adjust(100)});
     } else {
         res.json({status:'ok'});    
     }

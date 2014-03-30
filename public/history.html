@@ -1,37 +1,35 @@
 <!DOCTYPE html>
 <html>
 <head>
+<script src="/sprinklerlib.js"></script>
 <script>
 window.onload = function() {
-
-   function getZones (callback) {
-      var command = new XMLHttpRequest();
-      command.open("GET", "/config");
-      command.onreadystatechange = function () {
-         if (command.readyState === 4 && command.status === 200) {
-            var type = command.getResponseHeader("Content-Type");
-            callback((JSON.parse(command.responseText)).zones);
-         }
-      }
-
-      command.send(null);
-   }
 
    function getHistory (zones, callback) {
       var command = new XMLHttpRequest();
       command.open("GET", "/history");
       command.onreadystatechange = function () {
          if (command.readyState === 4 && command.status === 200) {
-            var type = command.getResponseHeader("Content-Type");
-            callback(zones, (JSON.parse(command.responseText)).history);
+            var response = JSON.parse(command.responseText);
+            // var type = command.getResponseHeader("Content-Type");
+            callback(zones, response.history);
          }
       }
       command.send(null);
    }
 
-   getZones (function (zones) {
+   function newColumn (text, index) {
+      var column = document.createElement("td");
+      column.innerHTML = text;
+      if (index & 1) column.setAttribute('bgcolor', '#E0E0E0');
+      return column;
+   }
 
-      getHistory (zones, function (zones, history) {
+   sprinklerInfo();
+
+   sprinklerConfig (function (config) {
+
+      getHistory (config.zones, function (zones, history) {
          var table = document.getElementsByTagName ('table')[0];
          for (var i = 0; i < history.length; i++) {
             var event = history[i];
@@ -50,12 +48,12 @@ window.onload = function() {
                   if (event.rain)
                      description = description+', RAINING';
                } else if (event.zone != null) {
-                  item = 'ZONE '+zones[event.zone].name;
-                  description = 'FOR '+event.seconds+'s, ';
+                  item = 'ZONE '+zones[event.zone].name+' ('+event.zone+')';
+                  description = 'FOR '+sprinklerShowDuration(event.seconds);
                   if (event.parent)
-                     description += 'IN PROGRAM '+event.parent;
+                     description += ', IN PROGRAM '+event.parent;
                   else
-                     description += 'MANUAL';
+                     description += ', MANUAL';
                }
                break;
             case 'END':
@@ -63,26 +61,26 @@ window.onload = function() {
                if (event.program != null) {
                   item = 'PROGRAM '+event.program;
                } else if (event.zone != null) {
-                  item = 'ZONE '+zones[event.zone].name;
-                  description = 'AFTER '+event.runtime+'s, ';
+                  item = 'ZONE '+zones[event.zone].name+' ('+event.zone+')';
+                  description = 'AFTER '+sprinklerShowDuration(event.runtime);
                   if (event.parent)
-                     description += 'IN PROGRAM '+event.parent;
+                     description += ', IN PROGRAM '+event.parent;
                   else
-                     description += 'MANUAL';
+                     description += ', MANUAL';
                }
                break;
             case 'CANCEL':
                action = 'CANCEL';
-               item = 'ZONE '+zones[event.zone].name;
-               description = 'AFTER '+event.runtime+'s, ';
+               item = 'ZONE '+zones[event.zone].name+' ('+event.zone+')';
+               description = 'AFTER '+sprinklerShowDuration(event.runtime);
                if (event.parent != null)
-                  description += 'IN PROGRAM '+event.parent;
+                  description += ', IN PROGRAM '+event.parent;
                else
-                  description += 'MANUAL';
+                  description += ', MANUAL';
                break;
             case 'SKIP':
                action = 'SKIP';
-               item = 'ZONE '+zones[event.zone].name;
+               item = 'ZONE '+zones[event.zone].name+' ('+event.zone+')';
                description = 'IN PROGRAM '+event.parent;
                break;
             case 'STARTUP':
@@ -95,25 +93,22 @@ window.onload = function() {
                break;
             }
             var row = document.createElement("tr");
-            var column = document.createElement("td");
-            column.innerHTML = timestamp.toLocaleString();
-            row.appendChild(column);
-            column = document.createElement("td");
-            column.innerHTML = item;
-            row.appendChild(column);
-            column = document.createElement("td");
-            column.innerHTML = action;
-            row.appendChild(column);
-            column = document.createElement("td");
-            column.innerHTML = description;
-            row.appendChild(column);
+            row.appendChild(newColumn(timestamp.toLocaleString(), i));
+            row.appendChild(newColumn(item, i));
+            row.appendChild(newColumn(action, i));
+            row.appendChild(newColumn(description, i));
             table.appendChild(row);
          }
       });
    });
 }
 </script>
-<body>
+<head>
+   <title>Sprinkler Controler <span class="hostname"></span></title>
+</head>
+<body bgcolor="#F5F5F5">
+   <h1>Sprinkler Controler <span class="hostname"></span></h1>
+   <h2>Event Log</h2>
    <table border="0">
       <tr bgcolor="green"><td width="25%">Time</td><td width="25%">Object</td><td width="5%">Action</td><td width="45%">Description</td></tr>
    </table>

@@ -1,45 +1,42 @@
 <!DOCTYPE html>
 <html>
 <head>
+<script src="/sprinklerlib.js"></script>
 <script>
 window.onload = function() {
 
-    function getPrograms (callback) {
-       var command = new XMLHttpRequest();
-       command.open("GET", "/config");
-       command.onreadystatechange = function () {
-          if (command.readyState === 4 && command.status === 200) {
-             var type = command.getResponseHeader("Content-Type");
-             callback((JSON.parse(command.responseText)).programs);
-          }
-       }
-       command.send(null);
-    }
+   function programClick () {
+      var command = new XMLHttpRequest();
+      command.open("GET", "/program/"+this.programindex+"/on");
+      command.send(null);
+   }
 
-    function programClick () {
-       var command = new XMLHttpRequest();
-       command.open("GET", "/program/"+this.programindex+"/on");
-       command.send(null);
-    }
+   sprinklerInfo();
 
-    getPrograms (function (programs) {
-       var outer = document.createElement("div");
-       var menu = document.createElement("menu");
-       for (var i = 0; i < programs.length; i++) {
-          var inner = document.createElement("div");
-          var button = document.createElement("button");
-          button.programindex = i;
-          button.onclick = programClick;
-          button.innerHTML = programs[i].name;
-          inner.appendChild(button);
-          menu.appendChild(inner);
-       }
-       outer.appendChild(menu);
-       document.body.appendChild(outer);
-    });
+   sprinklerConfig (function (config) {
+      var programs = config.programs;
+      var outer = document.createElement("div");
+      var menu = document.createElement("menu");
+      for (var i = 0; i < programs.length; i++) {
+         var inner = document.createElement("div");
+         var button = document.createElement("button");
+         button.programindex = i;
+         button.onclick = programClick;
+         button.innerHTML = programs[i].name;
+         inner.appendChild(button);
+         menu.appendChild(inner);
+      }
+      outer.appendChild(menu);
+      document.body.appendChild(outer);
+   });
 };
 </script>
+<head>
+   <title></title>
+</head>
 <body>
+   <h1>Sprinkler Controler <span class="hostname"></span></h1>
+   <h2>Programs</h2>
 </body>
 </html>
 
