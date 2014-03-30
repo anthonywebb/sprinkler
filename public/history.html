@@ -25,6 +25,16 @@ window.onload = function() {
       return column;
    }
 
+   function showZone (zones, event) {
+      return 'ZONE '+zones[event.zone].name+' ('+event.zone+')';
+   }
+
+   function showParent (event) {
+      if (event.parent)
+         return 'IN PROGRAM '+event.parent;
+      return 'MANUAL';
+   }
+
    sprinklerInfo();
 
    sprinklerConfig (function (config) {
@@ -42,18 +52,24 @@ window.onload = function() {
                action = 'START';
                if (event.program != null) {
                   item = 'PROGRAM '+event.program;
-                  description = 'WEATHER '+event.temperature+' F, '+event.humidity+'%';
-                  if (event.adjustment != null)
-                     description = description+', ADJUST '+event.adjustment+'%';
-                  if (event.rain)
-                     description = description+', RAINING';
+                  if (event.temperature != null) {
+                     description = 'WEATHER '+event.temperature+' F, '+event.humidity+'%';
+                     if (event.rain)
+                        description = description+', RAINING';
+                     else
+                        description = description+', NO RAIN';
+
+                     if (event.adjustment != null)
+                        description = description+', ADJUST '+event.adjustment+'%';
+                     else
+                        description = description+', DISABLED';
+                  } else {
+                     description = 'NO WEATHER DATA';
+                  }
                } else if (event.zone != null) {
-                  item = 'ZONE '+zones[event.zone].name+' ('+event.zone+')';
+                  item = showZone(zones, event);
                   description = 'FOR '+sprinklerShowDuration(event.seconds);
-                  if (event.parent)
-                     description += ', IN PROGRAM '+event.parent;
-                  else
-                     description += ', MANUAL';
+                  description += ', '+showParent(event);
                }
                break;
             case 'END':
@@ -61,27 +77,21 @@ window.onload = function() {
                if (event.program != null) {
                   item = 'PROGRAM '+event.program;
                } else if (event.zone != null) {
-                  item = 'ZONE '+zones[event.zone].name+' ('+event.zone+')';
+                  item = showZone(zones, event);
                   description = 'AFTER '+sprinklerShowDuration(event.runtime);
-                  if (event.parent)
-                     description += ', IN PROGRAM '+event.parent;
-                  else
-                     description += ', MANUAL';
+                  description += ', '+showParent(event);
                }
                break;
             case 'CANCEL':
                action = 'CANCEL';
-               item = 'ZONE '+zones[event.zone].name+' ('+event.zone+')';
+               item = showZone(zones, event);
                description = 'AFTER '+sprinklerShowDuration(event.runtime);
-               if (event.parent != null)
-                  description += ', IN PROGRAM '+event.parent;
-               else
-                  description += ', MANUAL';
+               description += ', '+showParent(event);
                break;
             case 'SKIP':
                action = 'SKIP';
-               item = 'ZONE '+zones[event.zone].name+' ('+event.zone+')';
-               description = 'IN PROGRAM '+event.parent;
+               item = showZone(zones, event);
+               description = showParent(event);
                break;
             case 'STARTUP':
                action = 'START';
