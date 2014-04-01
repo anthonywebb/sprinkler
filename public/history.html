@@ -37,12 +37,22 @@ window.onload = function() {
       return 'MANUAL';
    }
 
-   sprinklerInfo();
+   sprinklerUpdate();
 
-   sprinklerConfig (function (config) {
+   var lastEventId = null;
+
+   function updateHistory(config) {
 
       getHistory (config.zones, function (zones, history) {
-         var table = document.getElementsByTagName ('table')[0];
+         if ((lastEventId != null) && (lastEventId == history[0]._id)) {
+            return;
+         }
+         lastEventId = history[0]._id;
+
+         var table = document.getElementsByClassName ('sprkevent')[0];
+         for (var i = table.childNodes.length - 1; i > 1; i--) {
+            table.removeChild(table.childNodes[i]);
+         }
          for (var i = 0; i < history.length; i++) {
             var event = history[i];
             var timestamp = new Date(event.timestamp);
@@ -112,6 +122,11 @@ window.onload = function() {
             table.appendChild(row);
          }
       });
+   }
+
+   sprinklerConfig (function (config) {
+      updateHistory(config);
+      setInterval (function() {updateHistory(config)}, 5000);
    });
 }
 </script>

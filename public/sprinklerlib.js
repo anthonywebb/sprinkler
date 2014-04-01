@@ -43,7 +43,7 @@ function sprinklerSetContent (classname, content) {
    }
 }
 
-function sprinklerInfo () {
+function sprinklerUpdate () {
    var command = new XMLHttpRequest();
    command.open("GET", "/status");
    command.onreadystatechange = function () {
@@ -95,6 +95,11 @@ function sprinklerInfo () {
       }
    }
    command.send(null);
+}
+
+function sprinklerInfo () {
+   sprinklerUpdate();
+   setInterval (sprinklerUpdate, 1000);
 }
 
 function sprinklerConfig (callback) {
