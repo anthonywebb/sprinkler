@@ -36,6 +36,13 @@ console.log('hours='+hours+', minutes='+minutes);
    return ('00'+minutes).slice(-2)+':'+('00'+seconds).slice(-2);
 }
 
+function sprinklerSetContent (classname, content) {
+   var elements = document.getElementsByClassName (classname);
+   for (var i = 0; i < elements.length; i++) {
+      elements[i].innerHTML = content;
+   }
+}
+
 function sprinklerInfo () {
    var command = new XMLHttpRequest();
    command.open("GET", "/status");
@@ -47,28 +54,41 @@ function sprinklerInfo () {
          for (var i = 0; i < elements.length; i++) {
             elements[i].innerHTML = response.hostname;
          }
-         elements = document.getElementsByClassName ('activezone');
          var content;
+         var content2;
+
+
          if ((response.running == null) || (response.running.zone == null)) {
-            content = 'Idle';
+            content = 'IDLE';
+            content2 = 'IDLE';
          } else {
-            content = 'Zone '+response.running.zone+' active';
+            content = 'ZONE '+response.running.zone+' ACTIVE';
+            if (response.running.parent != null)
+               content2 = response.running.parent;
+            else
+               content2 = 'MANUAL';
          }
-         for (var i = 0; i < elements.length; i++) {
-            elements[i].innerHTML = content;
+         sprinklerSetContent ('activezone', content);
+         sprinklerSetContent ('activeprogram', content2);
+
+         if ((response.raintimer == null) || (! response.raindelay)) {
+            content = 'DISABLED';
+         } else {
+            var deadline = new Date(response.raintimer).getTime();
+            var delta = Math.floor((new Date().getTime() - deadline) / 1000);
+            content = sprinklerShowDuration(delta);
          }
-         elements = document.getElementsByClassName ('weatherupdated');
+         sprinklerSetContent ('raindelay', content);
+
          if ((response.weather == null) || (! response.weather.status)) {
-            content = 'Not Available';
+            content = 'NOT AVAILABLE';
          } else {
             var updated = new Date(response.weather.updated).getTime();
             var delta = Math.floor((new Date().getTime() - updated) / 1000);
-            var ago = sprinklerShowDuration(delta);
-            content = 'last update '+ago+' ago';
+            content = sprinklerShowDuration(delta)+' ago';
          }
-         for (var i = 0; i < elements.length; i++) {
-            elements[i].innerHTML = content;
-         }
+         sprinklerSetContent ('weatherupdated', content);
+
          title = document.getElementsByClassName ('hostname');
          var title = 'Sprinkler Controler '+response.hostname;
          document.getElementsByTagName ('title')[0].innerHTML = title;

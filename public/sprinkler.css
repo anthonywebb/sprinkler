@@ -1,0 +1,21 @@
+@import url(http://fonts.googleapis.com/css?family=Metrophobic);
+@import url(http://fonts.googleapis.com/css?family=Michroma);
+
+.sprkrbuttons {font-family:'Metrophobic', sans-serif; text-align: right; color: blue; float: right}
+.sprkrmenu {font-family:'Metrophobic', sans-serif; text-align: right; color: blue; float: right}
+.sprkrmenucell {text-align: right}
+.sprkrmenuitem {font-family:'Metrophobic', sans-serif;
+                color: mediumblue;
+                text-decoration: none}
+.sprkrstatus {font-family: 'Metrophobic', sans-serif; text-align: left; float: left}
+.sprkrdata {font-family: 'Michroma', sans-serif; font-weight: bold; color: darkgreen}
+.sprkevent {font-family: 'Metrophobic', sans-serif; text-align: left}
+
+body {background-color: '#F5F5F5'}
+h1 {font-family:'Metrophobic', sans-serif; font-weight: 700; text-align: center}
+button {font-family:'Metrophobic', sans-serif; font-weight: 700; text-align: center}
+table {border: 0}
+tr {border: 0}
+th {text-align: center; background-color: green}
+td {border: 0}
+

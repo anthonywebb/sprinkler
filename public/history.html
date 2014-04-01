@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
+<link rel=stylesheet type="text/css"
+      href="/sprinkler.css" title="Sprinkler">
 <script src="/sprinklerlib.js"></script>
 <script>
 window.onload = function() {
@@ -116,11 +118,15 @@ window.onload = function() {
 <head>
    <title>Sprinkler Controler <span class="hostname"></span></title>
 </head>
-<body bgcolor="#F5F5F5">
-   <h1>Sprinkler Controler <span class="hostname"></span></h1>
-   <h2>Event Log</h2>
-   <table border="0">
-      <tr bgcolor="green"><td width="25%">Time</td><td width="25%">Object</td><td width="5%">Action</td><td width="45%">Description</td></tr>
+<body>
+   <h1><span class="hostname"></span> - Log</h1>
+   <table class="sprkevent" border="0">
+      <tr>
+         <th width="25%">Time</th>
+         <th width="25%">Object</th>
+         <th width="5%">Action</th>
+         <th width="45%">Description</th>
+      </tr>
    </table>
 </body>
 </html>
