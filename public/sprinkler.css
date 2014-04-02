@@ -34,6 +34,7 @@ body {background-color: '#F5F5F5'}
 h1 {
    font-family:'Metrophobic', sans-serif;
    font-weight: 700;
+   font-size: 20px;
    text-align: center
 }
 button {
