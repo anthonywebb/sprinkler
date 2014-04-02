@@ -30,7 +30,6 @@ function sprinklerShowDuration (seconds) {
    if (minutes > 60) {
       var hours = Math.floor(minutes / 60);
       minutes = Math.floor(minutes % 60);
-console.log('hours='+hours+', minutes='+minutes);
       return ('00'+hours).slice(-2)+':'+('00'+minutes).slice(-2)+':'+('00'+seconds).slice(-2);
    }
    return ('00'+minutes).slice(-2)+':'+('00'+seconds).slice(-2);
@@ -50,13 +49,10 @@ function sprinklerUpdate () {
       if (command.readyState === 4 && command.status === 200) {
          // var type = command.getResponseHeader("Content-Type");
          var response = JSON.parse(command.responseText);
-         var elements = document.getElementsByClassName ('hostname');
-         for (var i = 0; i < elements.length; i++) {
-            elements[i].innerHTML = response.hostname;
-         }
          var content;
          var content2;
 
+         sprinklerSetContent ('hostname', response.hostname);
 
          if ((response.running == null) || (response.running.zone == null)) {
             content = 'IDLE';
@@ -83,9 +79,19 @@ function sprinklerUpdate () {
          if ((response.weather == null) || (! response.weather.status)) {
             content = 'NOT AVAILABLE';
          } else {
-            var updated = new Date(response.weather.updated).getTime();
-            var delta = Math.floor((new Date().getTime() - updated) / 1000);
-            content = sprinklerShowDuration(delta)+' ago';
+            content = new Date(response.weather.updated).toLocaleString();
+
+            var weathercmd = new XMLHttpRequest();
+            weathercmd.open("GET", "/weather");
+            weathercmd.onreadystatechange = function () {
+               if (weathercmd.responseText == '') return;
+               var response = JSON.parse(weathercmd.responseText);
+               sprinklerSetContent ('temperature', ''+response.temperature+' F');
+               sprinklerSetContent ('humidity', ''+response.humidity+'%');
+               sprinklerSetContent ('rain', ''+response.rain+' in');
+               sprinklerSetContent ('rainsensor', response.rainsensor?'sensor ON':'sensor OFF');
+            }
+            weathercmd.send(null);
          }
          sprinklerSetContent ('weatherupdated', content);
 
