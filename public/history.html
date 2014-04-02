@@ -66,8 +66,10 @@ window.onload = function() {
                   item = 'PROGRAM '+event.program;
                   if (event.temperature != null) {
                      description = 'WEATHER '+event.temperature+' F, '+event.humidity+'%';
-                     if (event.rain)
+                     if (event.rainsensor)
                         description = description+', RAINING';
+                     else if (event.rain >= 0.01)
+                        description = description+', '+event.rain+' in';
                      else
                         description = description+', NO RAIN';
 
