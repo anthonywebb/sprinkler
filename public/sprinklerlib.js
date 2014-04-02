@@ -67,8 +67,10 @@ function sprinklerUpdate () {
          sprinklerSetContent ('activezone', content);
          sprinklerSetContent ('activeprogram', content2);
 
-         if ((response.raintimer == null) || (! response.raindelay)) {
+         if (! response.raindelay) {
             content = 'DISABLED';
+         } else if (response.raintimer == null) {
+            content = 'NONE';
          } else {
             var deadline = new Date(response.raintimer).getTime();
             var delta = Math.floor((new Date().getTime() - deadline) / 1000);
