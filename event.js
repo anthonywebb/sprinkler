@@ -60,6 +60,9 @@ catch (err) {
 
 var syslog_enabled = false;
 
+var latestDate = new Date(0);
+var latestSequence = 1;
+
 // load up the database
 var nedb = require('nedb'); 
 var db = new nedb({ filename: path.events(), autoload: true });
@@ -75,11 +78,20 @@ exports.configure = function (config, options) {
 
 exports.record = function (data) {
    data.timestamp = new Date();
+   if (data.timestamp > latestDate) {
+      latestSequence = 1;
+      latestDate = data.timestamp;
+   } else {
+      latestSequence += 1;
+   }
+   data.sequence = latestSequence;
+
    db.insert(data, function (err, newDoc) {
       if(err){
          errorLog('Database insert error: '+err);
       }
    });    
+
    if (syslog_enabled) {
       description = '';
       if (data.zone!=null) {
@@ -111,6 +123,9 @@ exports.find = function (filter, callback) {
       } else {
          // The history is sorted most recent first.
          docs.sort(function (a, b) {
+            if (b.timestamp.getTime() == a.timestamp.getTime()) {
+               return b.sequence - a.sequence;
+            }
             return b.timestamp - a.timestamp;
          });
          callback({status: 'ok', history:docs});    
