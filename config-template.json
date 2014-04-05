@@ -26,6 +26,7 @@
     "timezone": "America/Boise",
     "raindelay": true,
     "production": false,
+    "event": {"syslog": false, "cleanup": 90},
     "programs": [
         {
             "active":true,

@@ -39,8 +39,11 @@
 //
 // USER CONFIGURATION
 //
-//   syslog              Enable (true) or disable (false) recording of events
+//   event.syslog        Enable (true) or disable (false) recording of events
 //                       through syslog.
+//
+//   event.cleanup       Delete events older than this number of days. Events
+//                       are kept indefinitely if not defined or 0.
 //
 
 var path = require('./path');
@@ -63,15 +66,22 @@ var syslog_enabled = false;
 var latestDate = new Date(0);
 var latestSequence = 1;
 
+var cleanup = 0;
+
 // load up the database
 var nedb = require('nedb'); 
 var db = new nedb({ filename: path.events(), autoload: true });
 
 exports.configure = function (config, options) {
 
-   if (config.syslog) {
-      if (syslog) {
-         syslog_enabled = true;
+   if (config.event) {
+      if (config.event.syslog) {
+         if (syslog) {
+            syslog_enabled = true;
+         }
+      }
+      if (config.event.cleanup) {
+         cleanup = config.event.cleanup;
       }
    }
 }
@@ -110,6 +120,14 @@ exports.record = function (data) {
          parent = '';
       }
       syslog.log(syslog.LOG_INFO, data.action+description+parent);
+   }
+
+   // Cleanup old events.
+   if (cleanup) {
+      if (latestSequence === 1) {
+         var old = new Date (latestDate.getTime() - (cleanup * 86400000));
+         db.remove ({timestamp: {$lt:old}}, {multi:true});
+      }
    }
 }
 
