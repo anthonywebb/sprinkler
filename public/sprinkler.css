@@ -4,7 +4,7 @@
 .sprkrbuttons {
    font-family:'Metrophobic', sans-serif;
    text-align: right;
-   width: 50%;
+   width: 30%;
    display: inline-table;
    float: right
 }
@@ -29,6 +29,11 @@
    width: 50%;
    display: inline-table;
    float: left
+}
+.sprkrtitle {
+   font-family: 'Metrophobic', sans-serif;
+   font-size: 25px;
+   text-align: left;
 }
 .sprkrdata {
    font-family: 'Iceland', sans-serif;

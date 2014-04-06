@@ -17,7 +17,7 @@ window.onload = function() {
 
    sprinklerConfig (function (config) {
       var programs = config.programs;
-      var buttons = document.getElementsByClassName ('sprkbuttons')[0];
+      var buttons = document.getElementsByClassName ('sprkrbuttons')[0];
       for (var i = 0; i < programs.length; i++) {
          var outer = document.createElement("tr");
          var inner = document.createElement("td");
@@ -36,8 +36,8 @@ window.onload = function() {
    <title></title>
 </head>
 <body>
-   <h1>Programs</h1>
    <table class="sprkrstatus">
+   <tr><td><span class="sprkrtitle">Programs</span></td></tr>
    <tr><td>Controler:</td></tr>
    <tr><td><span class="sprkrdata hostname"></span></td></tr>
    <tr><td>Zone Status:</td></tr>
