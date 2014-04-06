@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel=stylesheet type="text/css"
+      href="/sprinkler.css" title="Sprinkler">
+<script src="/sprinklerlib.js"></script>
+<script>
+function zoneOff () {
+   var command = new XMLHttpRequest();
+   command.open("GET", "/off");
+   command.send(null);
+}
+
+window.onload = function() {
+
+   function zoneClick () {
+      var command = new XMLHttpRequest();
+      command.open("GET", "/zone/"+this.zoneindex+"/on/60");
+      command.send(null);
+   }
+
+   sprinklerInfo ();
+
+   sprinklerConfig (function (config) {
+      var buttons = document.getElementsByClassName ('sprkrbuttons')[0];
+      for (var i = 0; i < config.zones.length; i++) {
+         var outer = document.createElement("tr");
+         var inner = document.createElement("td");
+         var button = document.createElement("button");
+         button.zoneindex = i;
+         button.onclick = zoneClick;
+         button.innerHTML = '<table class="zonetable"><tr><td class=="zoneindex">'+i+'</td><td class="zonename">'+config.zones[i].name+'</td></tr></table>';
+         inner.appendChild(button);
+         outer.appendChild(inner);
+         buttons.appendChild(outer);
+      }
+   });
+};
+</script>
+<head>
+   <title>Sprinkler Zones</title>
+</head>
+<body>
+   <table class="sprkrstatus">
+   <tr><td><span class="sprkrtitle">Zones</span></td></tr>
+   <tr><td>Controler:</td></tr>
+   <tr><td><span class="sprkrdata hostname"></span></td></tr>
+   <tr><td>Zone Status:</td></tr>
+   <tr><td><span class="sprkrdata activezone"></span></td></tr>
+   <tr><td>Program:</td></tr>
+   <tr><td><span class="sprkrdata activeprogram"></span></td></tr>
+   <tr><td>Rain delay:</td></tr>
+   <tr><td><span class="sprkrdata raindelay"></span></td></tr>
+   </table> <table class="sprkrbuttons"><tr><td><button onclick="zoneOff()"><span class="zonename">All Off</span></button></td></tr></table>
+</body>
+</html>
+

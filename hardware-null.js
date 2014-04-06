@@ -26,11 +26,24 @@
 //
 //   var hardware = require('./hardware');
 //
-//   hardware.configure (config);
+//   hardware.configure (hardwareConfig, userConfig, options);
 //
-//      Initialize the hardware module from the user configuration.
+//      Initialize the hardware module from the configuration.
 //      This method can be called as often as necessary (typically
-//      when the configuration has changed).
+//      when the user configuration has changed).
+//
+//   hardware.info ();
+//
+//      Return a data structure that describes the hardware managed by
+//      this driver. The data structure contains the following elements:
+//         id           A short unique identification string for the driver.
+//         title        A human-readable string that describes the hardware.
+//         zones.add    If true, the end-user may add (or remove) zones.
+//         zones.pin    If true, the end-user may set the pin name and active
+//                      state ('on' state).
+//         zones.max    If set, defines the maximum number of zones supported
+//                      by the hardware. If zones.max is defined and zones.add
+//                      is set to false, then the number of zones is fixed.
 //
 //   hardware.setZone (zone, on);
 //
@@ -44,7 +57,7 @@
 //
 //      Push the current zone controls to the outside world.
 //
-//   hardware.rainsensor ();
+//   hardware.rainSensor ();
 //
 //      Return true or false, true if rain is detected. Always return
 //      false if there is no rain sensor.
@@ -62,45 +75,41 @@
 //      structure guaranteed to contain an (oddly named) "output"
 //      item that contains the value of the input pin.
 //
-// CONFIGURATION
+// HARDWARE CONFIGURATION
 //
-//   rain                The name of the input pin for the rain sensor.
-//                       Rain sensor is ignored if omitted.
+//   (None.)
 //
-//   button              The name of the input pin for the button.
-//                       Button is ignored if omitted.
+// USER CONFIGURATION
 //
 //   zones               An array of structures containing one item named
-//                       'pin' (the name of the output pin for each zone).
+//                       'name' (the name of the zone).
 //
 
 var piodb = null;
 
-function debuglog (text) {
-   console.log ('Hardware: '+text);
+var debugLog = function (text) {}
+
+function verboseLog (text) {
+   console.log ('[DEBUG] Hardware(null): '+text);
 }
 
-exports.configure = function (config) {
+exports.configure = function (config, user, options) {
+   if (options && options.debug) {
+      debugLog = verboseLog;
+   }
    piodb = new Object();
 
-   piodb.rain = config.rain;
-   piodb.button = config.button;
-
-   var zonecount = config.zones.length;
+   var zonecount = user.zones.length;
    piodb.zones = new Array();
    for(var i = 0; i < zonecount; i++) {
       piodb.zones[i] = new Object();
-      piodb.zones[i].name = config.zones[i].name;
-      piodb.zones[i].pin = config.zones[i].pin;
-      debuglog ('configuring zone '+piodb.zones[i].name+' (#'+i+') as pin '+piodb.zones[i].pin);
+      piodb.zones[i].name = user.zones[i].name;
+      debugLog ('configuring zone '+piodb.zones[i].name+' (#'+i+')');
    }
+}
 
-   if (piodb.rain != null) {
-      debuglog ('configuring rain sensor as pin '+piodb.rain);
-   }
-   if (piodb.button != null) {
-      debuglog ('configuring button as pin '+piodb.rain);
-   }
+exports.info = function (attribute) {
+   return {id:"null",title:"Null Debug Driver",zones:{add:true,pin:true}};
 }
 
 exports.rainSensor = function () {
@@ -120,17 +129,17 @@ exports.buttonInterrupt = function (callback) {
 }
 
 exports.setZone = function (zone, on) {
-   if (piodb == null) {
+   if (! piodb) {
       return null;
    }
    if (on) {
-      debuglog ('zone '+piodb.zones[zone].name+' (#'+zone+', pin '+piodb.zones[zone].pin+') set to on');
+      debugLog ('zone '+piodb.zones[zone].name+' (#'+zone+') set to on');
    } else {
-      debuglog ('zone '+piodb.zones[zone].name+' (#'+zone+', pin '+piodb.zones[zone].pin+') set to off');
+      debugLog ('zone '+piodb.zones[zone].name+' (#'+zone+') set to off');
    }
 }
 
 exports.apply = function () {
-   debuglog ('apply');
+   debugLog ('apply');
 }
 

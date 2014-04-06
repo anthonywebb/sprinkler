@@ -1,52 +1,15 @@
+var os = require('os');
 var fs = require('graceful-fs');
 var dgram = require('dgram');
 var express = require('express');
 var moment = require('moment-timezone');
-var nedb = require('nedb'); 
 
+var path = require('./path');
+var event = require('./event');
+var hardware = require('./hardware');
 var calendar = require('./calendar');
 var weather = require('./weather');
-var hardware = require('./hardware');
 
-///////////////////////////////////////
-// LOAD THE DEFAULT CONFIG
-//////////////////////////////////////
-
-// Count the number of items (protected against the worst possible case).
-function resetCounts() {
-    if (config.zones != null) {
-        zonecount = config.zones.length;
-    }
-    else {
-        zonecount = 0;
-    }
-    if (config.programs != null) {
-        programcount = config.programs.length;
-    }
-    else {
-        programcount = 0;
-    }
-}
-
-var config = fs.readFileSync('./config.json');
-try {
-    config = JSON.parse(config);
-    //console.log(config);
-    calendar.configure(config);
-    weather.configure(config);
-
-    if (config.udp == null) {
-       config.udp = new Object();
-       config.udp.port = config.webserver.port;
-    }
-}
-catch (err) {
-    console.error('There has been an error parsing your config')
-    console.error(err);
-} 
-
-// load up the database
-var db = new nedb({ filename: './database', autoload: true });
 
 // Some of our default vars
 var zoneTimer = null;
@@ -60,14 +23,101 @@ var zonecount = 0;
 var programcount = 0;
 
 var rainDelayInterval = 86340000; // 1 day - 1 minute.
-var rainTimer = 0
+var rainTimer = 0;
 
-// Calculate the real counts from the configuration we loaded.
-resetCounts();
 
-hardware.configure (config);
-hardware.rainInterrupt (rainCallback);
-hardware.buttonInterrupt (buttonCallback);
+var errorLog = function (text) {
+    console.log ('[ERROR] '+text);
+}
+
+var options = new Object();
+
+process.argv.forEach(function(val, index, array) {
+    if (val == '--debug') {
+        options.debug = true;
+    }
+});
+
+var debugLog = function (text) {}
+
+if (options.debug) {
+    debugLog = function (text) {
+        console.log ('[DEBUG] '+text);
+    }
+}
+debugLog ('starting sprinkler');
+
+///////////////////////////////////////
+// LOAD THE PROGRAM CONFIGURATION
+//////////////////////////////////////
+
+// Count the number of items (protected against the worst possible case).
+function resetCounts() {
+    if (config.zones) {
+        zonecount = config.zones.length;
+    }
+    else {
+        zonecount = 0;
+    }
+    if (config.programs) {
+        programcount = config.programs.length;
+    }
+    else {
+        programcount = 0;
+    }
+}
+
+function activateConfig () {
+
+    event.configure(config, options);
+    hardware.configure (hardwareConfig, config, options);
+    hardware.rainInterrupt (rainCallback);
+    hardware.buttonInterrupt (buttonCallback);
+    calendar.configure(config, options);
+    weather.configure(config, options);
+    // Calculate the real counts from the configuration we loaded.
+    resetCounts();
+}
+
+function saveConfig (body) {
+
+    var data = JSON.stringify(body);
+
+    fs.writeFile(path.userConfig(), data, function (err) {
+        if (err) {
+            errorLog('failed to save configuration data: '+err.message);
+            return;
+        }
+        debugLog('Configuration saved successfully.');
+        config = body;
+        activateConfig();
+    });
+}
+
+try {
+    var hardwareConfig = fs.readFileSync(path.hardwareConfig());
+    hardwareConfig = JSON.parse(hardwareConfig);
+}
+catch (err) {
+    errorLog('There has been an error loading or parsing the hardware config: '+err)
+} 
+
+var config = fs.readFileSync(path.userConfig());
+try {
+    config = JSON.parse(config);
+    debugLog("User configuration parsed");
+
+    activateConfig();
+}
+catch (err) {
+    errorLog('There has been an error parsing the user config: '+err)
+} 
+
+if (!config.weather) {
+    config.weather = new Object();
+    config.weather.enable = false;
+}
+
 
 ///////////////////////////////////////
 // CONFIGURE THE WEBSERVER
@@ -76,6 +126,7 @@ var app = express();
 app.use(express.favicon());
 app.use(express.bodyParser());
 app.use(app.router);
+app.use(express.static(__dirname+'/public'));
 app.use(missingHandler);
 
 // Routes
@@ -84,124 +135,258 @@ app.get('/config', function(req, res){
 });
 
 app.post('/config', function(req, res){
-    //console.log(req.body);
+    //debugLog(req.body);
 
-    var data = JSON.stringify(req.body);
-
-    fs.writeFile('./config.json', data, function (err) {
-        if (err) {
-            console.error('failed to save configuration data: '+err.message);
-            return;
-        }
-        console.log('Configuration saved successfully.');
-        config = req.body;
-        calendar.configure(config);
-        weather.configure(config);
-        hardware.configure (config);
-        hardware.rainInterrupt (rainCallback);
-        hardware.buttonInterrupt (buttonCallback);
-        resetCounts();
-    });
+    saveConfig (req.body);
 
     res.json({status:'ok',msg:'config saved'});
 });
 
 app.get('/status', function(req, res){
-    res.json({status:'ok',running:running,queue:runqueue});
+    var now = new Date().getTime();
+    if ((config.raindelay) && (now < rainTimer)) {
+       res.json({status:'ok',hostname:os.hostname(),weather:{enable:config.weather.enable,status:weather.status(),updated:weather.updated()},calendars:calendar.status(),raintimer:new Date(rainTimer),raindelay:config.raindelay,running:running,queue:runqueue});
+    } else {
+       res.json({status:'ok',hostname:os.hostname(),weather:{enable:config.weather.enable,status:weather.status(),updated:weather.updated()},calendars:calendar.status(),raindelay:config.raindelay,running:running,queue:runqueue});
+    }
 });
 
 app.get('/off', function(req, res){
-    zonesOff(true);
-    res.json({status:'ok',msg:'all zones have been turned off'});
+    killQueue();
+    res.json({status:'ok',hostname:os.hostname(),msg:'all zones have been turned off'});
 });
 
-// This URL is to simulate the physical button. For test only.
+// This URL is to simulate the physical button.
 app.get('/button', function(req, res){
     buttonCallback({output: true});
     if (currOn == 0) {
-        res.json({status:'ok',msg:'No zone turned on'});
+        res.json({status:'ok',hostname:os.hostname(),msg:'No zone turned on'});
     }
     else {
         var zone = currOn - 1;
-        res.json({status:'ok',msg:'Current zone is '+zone});
+        res.json({status:'ok',hostname:os.hostname(),msg:'Current zone is '+config.zones[zone].name+' ('+zone+')'});
     }
 });
 
+// This URL is a manual rain delay.
+app.get('/raindelay', function(req, res){
+    if (! config.raindelay) {
+        config.raindelay = true;
+        saveConfig (config);
+    }
+    var now = new Date().getTime();
+    if (now > rainTimer) {
+        // There was no rain delay pending: start a new one.
+        rainTimer = now + rainDelayInterval;
+    } else {
+        // A rain delay is pending: extend it.
+        rainTimer = rainTimer + rainDelayInterval;
+    }
+    var until = new Date(rainTimer);
+    res.json({status:'ok',hostname:os.hostname(),msg:'Programs delayed until '+until.getDate()+'/'+(until.getMonth()+1)+'/'+until.getFullYear()});
+});
+
+// This URL is a way to enable/disable the rain delay feature.
+app.get('/raindelay/:flag', function(req, res){
+    var old = config.raindelay;
+    if (req.params.flag == 'true') {
+        config.raindelay = true;
+        res.json({status:'ok',hostname:os.hostname(),msg:'Rain delay enabled'});
+    } else {
+        config.raindelay = false;
+        rainTimer = 0;
+        res.json({status:'ok',hostname:os.hostname(),msg:'Rain delay disabled'});
+    }
+    if (old != config.raindelay) {
+        saveConfig (config);
+    }
+});
+
+// This URL is a way to enable/disable the weather adjustment feature.
+app.get('/weather/:flag', function(req, res){
+    var old = config.weather.enable;
+    if (req.params.flag == 'true') {
+        config.weather.enable = true;
+        res.json({status:'ok',hostname:os.hostname(),msg:'Weather adjustment enabled'});
+    } else {
+        config.weather.enable = false;
+        res.json({status:'ok',hostname:os.hostname(),msg:'Weather adjustment disabled'});
+    }
+    if (old != config.weather.enable) {
+        saveConfig (config);
+    }
+});
+
+app.get('/refresh', function(req, res){
+    activateConfig();
+    res.json({status:'ok',hostname:os.hostname(),msg:'Refresh initiated'});
+});
+
 app.get('/history', function(req, res){
-    // Finding all the history for this zone
-    db.find({}, function (err, docs) {
-        if(err){
-            console.error(err);
-            res.json({status: 'error', msg:err.message});
-        } else {
-            reportHistory(res, docs);
-        }
+    // Finding all the history for all zones
+    event.find({}, function (response) {
+        response.hostname = os.hostname();
+        res.json(response);
     });
+});
+
+app.get('/system/history', function(req, res){
+    // Finding all the system events
+    event.find({action: {$nin:['START', 'END', 'CANCEL']}}, function (response) {
+        response.hostname = os.hostname();
+        res.json(response);
+    });
+});
+
+function retrieveProgramById (id) {
+
+    if (id.match(/C/)) {
+       var index = parseInt(id.substring(1));
+       var programs = calendar.programs();
+       if(index>=0 && index<programs.length){
+          return programs[index];
+       }
+       return null;
+    }
+    if (id.match(/L/)) {
+       var index = parseInt(id.substring(1));
+       if(index>=0 && index<config.programs.length){
+          return config.programs[index];
+       }
+       return null;
+    }
+    var index = parseInt(id);
+    if(index>=0 && index<config.programs.length){
+       return config.programs[index];
+    }
+    return null;
+}
+
+app.get('/program/:id/history', function(req, res){
+    // Finding the history's main events for this program
+    var program = retrieveProgramById (req.params.id);
+    if (program) {
+       event.find({program: program.name}, function (response) {
+          response.hostname = os.hostname();
+          res.json(response);
+       });
+    }
+    else {
+        errorHandler(res,''+req.params.id+' is not a valid program');
+    }
+});
+
+app.get('/program/:id/full/history', function(req, res){
+    // Finding all the history for this program
+    var program = retrieveProgramById (req.params.id);
+    if (program) {
+       event.find({$or:[{program:program.name}, {parent:program.name}]}, function (response) {
+          response.hostname = os.hostname();
+          res.json(response);
+       });
+    }
+    else {
+        errorHandler(res,''+req.params.id+' is not a valid program');
+    }
 });
 
 app.get('/zone/:id/history', function(req, res){
     // Finding all the history for this zone
-    db.find({ zone: parseInt(req.params.id) }, function (err, docs) {
-        if(err){
-            console.error(err);
-            res.json({status: 'error', msg:err.message});
-        } else {
-            reportHistory(res, docs);
-        }
+    event.find({ zone: parseInt(req.params.id) }, function (response) {
+        response.hostname = os.hostname();
+        res.json(response);
     });
 });
 
 app.get('/zone/:id/on/:seconds', function(req, res){
     if(req.params.id>=0 && req.params.id<zonecount){
         zoneOn(req.params.id,req.params.seconds);
-        res.json({status:'ok',msg:'started zone: '+config.zones[req.params.id].name});    
+        res.json({status:'ok',hostname:os.hostname(),msg:'started zone: '+config.zones[req.params.id].name});    
     }
     else {
-        errorHandler(res,'That is not a valid zone')
+        errorHandler(res,''+req.params.id+' is not a valid zone')
     }
 });
 
 app.get('/program/:id/on', function(req, res){
-    if(req.params.id>=0 && req.params.id<programcount){
-        programOn(config.programs[req.params.id]);
-        res.json({status:'ok',msg:'started program: '+config.programs[req.params.id].name});    
+    var program = retrieveProgramById (req.params.id);
+    if (program) {
+        programOn(program);
+        res.json({status:'ok',hostname:os.hostname(),msg:'started program: '+program.name});    
     }
     else {
-        errorHandler(res,'That is not a valid program');
+        errorHandler(res,''+req.params.id+' is not a valid program');
     }
 });
 
+app.get('/calendar/programs', function(req, res){
+    res.json(calendar.programs());
+});
+
+app.get('/weather', function(req, res){
+    if (weather.status()) {
+        res.json({status:'ok',hostname:os.hostname(),temperature:weather.temperature(),humidity:weather.humidity(),rain:weather.rain(),rainsensor:weather.rainsensor(),adjustment:weather.adjust(100)});
+    } else {
+        res.json({status:'ok'});    
+    }
+});
+
+app.get('/hardware/info', function(req, res){
+    res.json(hardware.info());
+});
+
 ///////////////////////////////////////
-// START UP THE APP
+// SCHEDULER
 //////////////////////////////////////
-app.listen(config.webserver.port);
-console.log('Listening on port '+config.webserver.port);
 
-// turn off all zones
-zonesOff(true);
-
-// Go through the list of programs to search one to activate.
-function schedulePrograms (programs, currTime, currDay) {
+// Go through one list of watering programs to search one to activate.
+//
+function schedulePrograms (programs, currTime, currDay, d) {
     if (programs == null) return;
     for(var i=0;i<programs.length;i++){
-        if(programs[i].active && currTime == programs[i].start &&  programs[i].days.indexOf(currDay) != -1){
+        // Eliminate immediately a program that would not start
+        // at this exact time, or was disabled.
+        if (currTime != programs[i].start) continue;
+        if (! programs[i].active) continue;
+
+        // Now check if the program should start today.
+        if (programs[i].days) {
+            // Runs weekly, on specific days of the week.
+            debugLog ('Checking day for program '+programs[i].name+' (weekly)');
+            if(programs[i].days.indexOf(currDay) != -1){
+                programOn(programs[i]);
+            }
+            continue;
+        }
+
+        var date = moment(programs[i].date+' '+currTime, 'YYYYMMDD HH:mm');
+        var delta = d.diff(date, 'days');
+        if (delta < 0) continue; // Start at a future date.
+
+        if (programs[i].interval) {
+            // Runs daily, at some day interval.
+            debugLog ('Checking day for program '+programs[i].name+' (daily, interval='+programs[i].interval+', delta='+delta+')');
+            if ((delta % programs[i].interval) == 0) {
+                programOn(programs[i]);
+            }
+            continue;
+        }
+        // Otherwise, this program runs at the specified date (once).
+        debugLog ('Checking day for program '+programs[i].name+' (once, delta='+delta+')');
+        if (delta == 0) {
             programOn(programs[i]);
+            programs[i].active = false; // Do not run it again.
+            continue;
+        }
+        if (delta > 0) {
+            programs[i].active = false; // Obsolete, do not run it anymore.
         }
     }
 }
 
-// Add the listener for recurring program schedules
+// Schedule all watering programs.
 //
-// The calendar programs are kept separate from the programs in config,
-// so that they are not saved to config.json as a side effect.
-// Another solution would be to build a list of programs to execute, separate
-// from the config object, that would be an union of config and calendar.
-//
-// (Shannon's sampling theorem: sample every 30s to detect a 1mn period
-// event reliably, i.e. never miss a minute. However this will cause
-// the server to check the same minute twice: the solution is to remember
-// the last time processed.)
-setInterval(function(){
+function scheduler () {
     var d = moment().tz(config.timezone);
     var currTime = d.format('HH:mm');
     var currDay = parseInt(d.format('d'));
@@ -217,24 +402,62 @@ setInterval(function(){
     // The rationale is that we hope that this will make the controller's
     // behavior more predictable. This is just a (debatable) choice.
 
-    var now = new Date().getTime();
+    if (config.raindelay) {
+        var now = new Date().getTime();
 
-    if (hardware.rainSensor() || weather.rainsensor()) {
-          rainTimer = now + rainDelayInterval;
+        if (hardware.rainSensor() || weather.rainsensor()) {
+              var nextTimer = now + rainDelayInterval;
+              if (nextTimer > rainTimer) {
+                  rainTimer = nextTimer;
+              }
+        }
+        if (rainTimer > now) return;
     }
-    if (rainTimer > now) return;
 
-    schedulePrograms (config.programs, currTime, currDay);
-    schedulePrograms (calendar.programs(), currTime, currDay);
+    schedulePrograms (config.programs, currTime, currDay, d);
+    schedulePrograms (calendar.programs(), currTime, currDay, d);
+}
 
-},30000);
+///////////////////////////////////////
+// START UP THE APP
+//////////////////////////////////////
 
+app.listen(config.webserver.port);
+debugLog('Listening on port '+config.webserver.port);
+
+// turn off all zones
+killQueue();
+
+// Add the listener for recurring program schedules
+//
+// The calendar programs are kept separate from the programs in config,
+// so that they are not saved to config.json as a side effect.
+// Another solution would be to build a list of programs to execute, separate
+// from the config object, that would be an union of config and calendar.
+//
+// We schedule every 10s to start reasonably close to the beginning of
+// a 1mn period. The scheduler is responsible for handling frequent calls.
+//
+setInterval(function(){
+    scheduler();
+},10000);
+
+// Add the listener for periodic information refresh.
+//
+// This does not need to be fast (here: 10mn), but each refresh function
+// called is free to do nothing until a longer delay has expired.
+//
 setInterval(function(){
     calendar.refresh();
     weather.refresh();
 },600000);
 
 // Start auto discovery UDP broadcast ping
+//
+if (config.udp == null) {
+   config.udp = new Object();
+   config.udp.port = config.webserver.port;
+}
 var message = new Buffer("sprinkler "+config.webserver.port);
 var socket = dgram.createSocket("udp4");
 // TBD: better use callback: socket.bind(config.webserver.port, function() {
@@ -246,41 +469,24 @@ setTimeout(function(){
 setInterval(function(){
     socket.send(message, 0, message.length, 41234, '255.255.255.255', function(err, bytes) {
         if(err){
-            console.error(err);
+            errorLog('cannot send periodic broadcast signature: '+err);
         }
     });
 },6000);
 
+event.record({action: 'STARTUP'});
 
 ///////////////////////////////////////
 // HELPERS
 //////////////////////////////////////
 
-function reportHistory (res, docs) {
-   // The history is sorted most recent first.
-   docs.sort(function (a, b) {
-       return b.timestamp - a.timestamp;
-   });
-   res.json({status: 'ok', history:docs});    
-}
-
-function logEvent (data) {
-    data.timestamp = new Date();
-    db.insert(data, function (err, newDoc) {
-        if(err){
-            console.error('Database insert error: '+err);
-        }
-        //console.log('wrote record '+newDoc._id);
-    });    
-}
-
 function missingHandler(req, res, next) {
-    console.log('404 Not found - '+req.url);
+    errorLog('404 Not found - '+req.url);
     res.json(404, { status: 'error', msg: 'Not found, sorry...' });
 }
 
 function errorHandler(res, msg) {
-    console.log(msg);
+    errorLog(msg);
     res.json(500, { status: 'error', msg: msg });
 }
 
@@ -296,42 +502,70 @@ function clearTimers() {
 }
 
 function zoneOn(index,seconds) {
-    zonesOff(true);
+    killQueue();
     runqueue.push({zone:index,seconds:seconds,parent:null});
     processQueue();
 }
 
 function programOn(program) {
-    zonesOff(true);
-    logEvent({action: 'START', program: program.name, temperature: weather.temperature(), humidity: weather.humidity(), rain: weather.rain(), adjustment: weather.adjustment()});
+    debugLog ('Running program '+program.name);
+    if ((!program.options) || (!program.options.append)) {
+        killQueue();
+    }
 
-    runqueue = program.zones;
+    // We need to clone the list of zones because we remove each item from
+    // the list of zones in the queue after it has run its course: without
+    // cloning we would destroy the list of zones in the program itself.
+    //
+    for (var i = 0; i < program.zones.length; i++) {
 
-    // Adjust the program's zones duration according to the weather.
-    // Note that we do not adjust a manual activation on an individual
-    // zone: the user knows what he is doing.
+        // Add the capability to disable one zone, when activated from
+        // a program. Keep the ability to control it manually. This is
+        // typically for a zone with a problem (broken pipe, leak, etc).
+        // This way one can avoid this zone without modifying all programs.
+        //
+        if (config.zones[program.zones[i].zone].manual) {
+           event.record({action: 'SKIP', zone:program.zones[i].zone-0, parent: program.name, seconds: 0});
+           continue;
+        }
 
-    for (var i = 0; i < runqueue.length; i++) {
-         runqueue[i].parent = program.name;
-         runqueue[i].seconds =
-             (runqueue[i].seconds * weather.adjustment()) / 100;
+        var zone = program.zones[i].zone;
+        var seconds = program.zones[i].seconds;
+
+        if (weather.status()) {
+            if (config.weather.enable) {
+                // Adjust the zone duration according to the weather.
+                // Note that we do not adjust a manual activation on
+                // a manual zone start: the user knows what he is doing.
+                //
+                seconds = weather.adjust(seconds);
+            }
+        }
+        runqueue.push({zone:zone,seconds:seconds,parent:program.name});
+    }
+
+    if (weather.status()) {
+        if (config.weather.enable) {
+            event.record({action: 'START', program: program.name, temperature: weather.temperature(), humidity: weather.humidity(), rain: weather.rain(), adjustment: weather.adjust(100)});
+        } else {
+            event.record({action: 'START', program: program.name, temperature: weather.temperature(), humidity: weather.humidity(), rain: weather.rain()});
+        }
+    } else {
+        event.record({action: 'START', program: program.name});
     }
     processQueue();
 }
 
-function zonesOff(killqueue) {
-    // shut down all the zones
-    // console.log('shutting off all zones');
+// Shut down all the zones and stop the current action.
+//
+function zonesOff() {
+    debugLog('shutting off all zones');
     
-    // if we are currently running something
-    if(running.seconds){
+    // if we are currently running something, log that we interrupted it.
+    if(running.seconds) {
         if(running.remaining == 1) running.remaining = 0;
         var runtime = running.seconds-running.remaining;
-        var action = 'END';
-        if (killqueue) {
-            action = 'CANCEL';
-        }
-        logEvent({action: action, zone: running.zone-0, parent: running.parent, seconds: running.seconds, runtime: runtime});
+        event.record({action: 'CANCEL', zone: running.zone-0, parent: running.parent, seconds: running.seconds, runtime: runtime});
     }
 
     running = {};
@@ -340,13 +574,13 @@ function zonesOff(killqueue) {
         hardware.setZone (i, false);
     }
     hardware.apply();
+}
 
-    if(killqueue){
-        //console.log('clearing the queue');
-        runqueue = [];
-        // kill any outstanding timers
-        clearTimers();
-    }
+function killQueue() {
+    debugLog('clearing the queue');
+    zonesOff();
+    runqueue = [];
+    clearTimers();
 }
 
 function processQueue() {
@@ -355,54 +589,71 @@ function processQueue() {
         // start working on the next item in the queue
         running = runqueue.shift();
 
-        if ((running.zone < 0) || (running.zone >= zonecount)) {
-            // Don't process an invalid program.
-            console.error('Invalid zone '+running.zone);
+        if(running.seconds <= 0) {
+            // Skip that zone.
+            processQueue();
             return;
         }
-        logEvent({action: 'START', zone:running.zone-0, parent: running.parent, seconds: running.seconds});
+
+        if ((running.zone == null) || (running.zone == undefined) || (running.zone < 0) || (running.zone >= zonecount)) {
+            // Don't process an invalid program.
+            errorLog('Invalid zone '+running.zone);
+            return;
+        }
+        event.record({action: 'START', zone:running.zone-0, parent: running.parent, seconds: running.seconds});
 
         running.remaining = running.seconds;
 
         hardware.setZone (running.zone, true);
+        hardware.apply();
 
-        if(running.seconds > 0) {
-            // clear any timers that are currently running
-            clearTimers();
+        // clear any timers that are currently running
+        clearTimers();
 
-            // count down the time remaining
-            zoneInterval = setInterval(function(){
-                if(running.zone){
-                    running.remaining = running.remaining - 1;
-                }
+        // count down the time remaining
+        zoneInterval = setInterval(function(){
+            if(running.zone != null){
+                running.remaining = running.remaining - 1;
+            }
                 
-            },1000) 
+        },1000) 
 
-            // start a countdown timer for the zone watering time
-            zoneTimer = setTimeout(function(){
-                // turn off the zones, pass false so it wont kill the rest of the items in the queue
-                zonesOff(false);
+        // start a countdown timer for the zone watering time
+        zoneTimer = setTimeout(function(){
+            hardware.setZone (running.zone, false);
+            hardware.apply();
 
-                // wait a couple seconds and kick off the next
-                setTimeout(function(){
-                    processQueue();
-                },2000) 
+            event.record({action: 'END', zone: running.zone-0, parent: running.parent, seconds: running.seconds, runtime: running.seconds});
 
-            },running.seconds*1000);
-        }
+            if (running.parent) {
+               if (runqueue.length) {
+                  if (running.parent != runqueue[0].parent) {
+                     event.record({action: 'END', program: running.parent});
+                  }
+               } else {
+                  event.record({action: 'END', program: running.parent});
+               }
+            }
+            running = {};
+
+            // wait a couple seconds and kick off the next
+            setTimeout(function(){
+                processQueue();
+            },2000) 
+
+        },running.seconds*1000);
 
     } else {
         // once there is nothing left to process we can clear the timers
+        zonesOff();
         clearTimers();
-        logEvent({action: 'IDLE'});
+        event.record({action: 'IDLE'});
     }
-    hardware.apply();
 }
 
 function rainCallback(x) {
     if(x.output){
-        console.log('Raining!');
-        console.log(JSON.stringify(x));  
+        debugLog('Raining! '+JSON.stringify(x));
         rainTimer = new Date().getTime() + rainDelayInterval;
     }
 }
@@ -417,17 +668,17 @@ function buttonCallback(x) {
         if (currOn<=zonecount){
             buttonTimer = setTimeout (function () {
                 var zone = currOn - 1;
-                console.log('Turning on zone '+zone);
+                debugLog('Turning on zone '+zone);
                 zoneOn(zone,900);
             }, 2000);
         }
         else {
-            console.log('All done, back to the start');
+            debugLog('All done, back to the start');
             currOn = 0;
         }
 
-        console.log('Button Pressed!');
-        console.log(JSON.stringify(x));   
+        debugLog('Button Pressed!');
+        debugLog(JSON.stringify(x));   
     }
 }
 

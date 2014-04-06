@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel=stylesheet type="text/css"
+      href="/sprinkler.css" title="Sprinkler">
+<script src="/sprinklerlib.js"></script>
+<script>
+window.onload = function() {
+
+   function getHistory (zones, callback) {
+      var command = new XMLHttpRequest();
+      command.open("GET", "/history");
+      command.onreadystatechange = function () {
+         if (command.readyState === 4 && command.status === 200) {
+            var response = JSON.parse(command.responseText);
+            // var type = command.getResponseHeader("Content-Type");
+            callback(zones, response.history);
+         }
+      }
+      command.send(null);
+   }
+
+   function newColumn (text, index) {
+      var column = document.createElement("td");
+      column.innerHTML = text;
+      if (index & 1) column.setAttribute('bgcolor', '#E0E0E0');
+      return column;
+   }
+
+   function showZone (zones, event) {
+      return 'ZONE '+zones[event.zone].name+' ('+event.zone+')';
+   }
+
+   function showParent (event) {
+      if (event.parent)
+         return 'IN PROGRAM '+event.parent;
+      return 'MANUAL';
+   }
+
+   sprinklerUpdate();
+
+   var lastEventId = null;
+
+   function updateHistory(config) {
+
+      getHistory (config.zones, function (zones, history) {
+         if ((lastEventId != null) && (lastEventId == history[0]._id)) {
+            return;
+         }
+         lastEventId = history[0]._id;
+
+         var table = document.getElementsByClassName ('sprkrevent')[0];
+         for (var i = table.childNodes.length - 1; i > 1; i--) {
+            table.removeChild(table.childNodes[i]);
+         }
+         for (var i = 0; i < history.length; i++) {
+            var event = history[i];
+            var timestamp = new Date(event.timestamp);
+            var action = '';
+            var item = '';
+            var description = '';
+            switch(event.action) {
+            case 'START':
+               action = 'START';
+               if (event.program != null) {
+                  item = 'PROGRAM '+event.program;
+                  if (event.temperature != null) {
+                     description = 'WEATHER '+event.temperature+' F, '+event.humidity+'%';
+                     if (event.rainsensor)
+                        description = description+', RAINING';
+                     else if (event.rain >= 0.01)
+                        description = description+', '+event.rain+' in';
+                     else
+                        description = description+', NO RAIN';
+
+                     if (event.adjustment != null)
+                        description = description+', ADJUST '+event.adjustment+'%';
+                     else
+                        description = description+', DISABLED';
+                  } else {
+                     description = 'NO WEATHER DATA';
+                  }
+               } else if (event.zone != null) {
+                  item = showZone(zones, event);
+                  description = 'FOR '+sprinklerShowDuration(event.seconds);
+                  description += ', '+showParent(event);
+               }
+               break;
+            case 'END':
+               action = 'END';
+               if (event.program != null) {
+                  item = 'PROGRAM '+event.program;
+               } else if (event.zone != null) {
+                  item = showZone(zones, event);
+                  description = 'AFTER '+sprinklerShowDuration(event.runtime);
+                  description += ', '+showParent(event);
+               }
+               break;
+            case 'CANCEL':
+               action = 'CANCEL';
+               item = showZone(zones, event);
+               description = 'AFTER '+sprinklerShowDuration(event.runtime);
+               description += ', '+showParent(event);
+               break;
+            case 'SKIP':
+               action = 'SKIP';
+               item = showZone(zones, event);
+               description = showParent(event);
+               break;
+            case 'STARTUP':
+               action = 'START';
+               item = 'SYSTEM';
+               break;
+            case 'IDLE':
+               action = 'IDLE';
+               item = 'SYSTEM';
+               break;
+            }
+            var row = document.createElement("tr");
+            row.appendChild(newColumn(timestamp.toLocaleString(), i));
+            row.appendChild(newColumn(item, i));
+            row.appendChild(newColumn(action, i));
+            row.appendChild(newColumn(description, i));
+            table.appendChild(row);
+         }
+      });
+   }
+
+   sprinklerConfig (function (config) {
+      updateHistory(config);
+      setInterval (function() {updateHistory(config)}, 5000);
+   });
+}
+</script>
+<head>
+   <title></title>
+</head>
+<body>
+   <h1><span class="hostname"></span></h1>
+   <table class="sprkrevent" border="0">
+      <tr>
+         <th width="25%">Time</th>
+         <th width="25%">Object</th>
+         <th width="5%">Action</th>
+         <th width="45%">Description</th>
+      </tr>
+   </table>
+</body>
+</html>
+

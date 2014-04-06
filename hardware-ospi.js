@@ -2,7 +2,7 @@
 //
 // NAME
 //
-//   hardware - a module to hide the interface to the OpenSprinkler OSBo.
+//   hardware - a module to hide the interface to the OpenSprinkler OSPi
 //
 // SYNOPSYS
 //
@@ -16,12 +16,12 @@
 //   hardware interfaces. Only one hardware interface is supported at
 //   a given time: you must have installed the right driver.
 //
-//   This specific implementation supports the OpenSprinkler OSBo board.
+//   This specific implementation supports the OpenSprinkler OSPi board.
 //
-//   This module does not support the real-time clock or the relay (yet).
+//   This module does not support the real-time clock or the A/D D/A chip.
 //
 //   To enable this driver, create 'hardware.js' as a symbolic link to
-//   'hardware-osbo.js'.
+//   'hardware-ospi.js'.
 //
 // DESCRIPTION
 //
@@ -94,17 +94,17 @@
 //
 // HARDWARE CONFIGURATION
 //
-//   osbo.pins.data      The I/O pin to use for the data signal.
+//   ospi.pins.data      The I/O pin to use for the data signal.
 //
-//   osbo.pins.clock     The I/O pin to use for the clock signal.
+//   ospi.pins.clock     The I/O pin to use for the clock signal.
 //
-//   osbo.pins.enable    The I/O pin to use for the output enable signal.
+//   ospi.pins.enable    The I/O pin to use for the output enable signal.
 //
-//   osbo.pins.latch     The I/O pin to use for the data latch signal.
+//   ospi.pins.latch     The I/O pin to use for the data latch signal.
 //
-//   osbo.pins.rain      The I/O pin to use for the rain sensor.
+//   ospi.pins.rain      The I/O pin to use for the rain sensor (not on OSPi).
 //
-//   osbo.pins.edge      The active edge of the rain sensor (RISING, FALLING).
+//   ospi.pins.button    The I/O pin to use for a button (not on OSPi).
 //
 // USER CONFIGURATION
 //
@@ -121,20 +121,14 @@
 var debugLog = function (text) {}
 
 function verboseLog (text) {
-   console.log ('[DEBUG] Hardware(osbo): '+text);
+   console.log ('[DEBUG] Hardware(ospi): '+text);
 }
 
 function errorLog (text) {
-   console.error ('[ERROR] Hardware(osbo): '+text);
+   console.error ('[ERROR] Hardware(ospi): '+text);
 }
 
-try {
-   var io = require('bonescript');
-}
-catch (err) {
-   errorLog ('cannot access module bonescript');
-   var io = null;
-}
+gpio = require('./gpio').Gpio;
 
 var piodb = new Object(); // Make sure it exists (simplify validation).
 
@@ -142,94 +136,101 @@ exports.configure = function (config, user, options) {
    if (options && options.debug) {
       debugLog = verboseLog;
    }
-   if ((! io) || (! user.production)) {
+   if (! user.production) {
       debugLog ('using debug I/O module');
-      io = require('./iodebug');
+      gpio = null;
    }
    piodb = new Object();
    piodb.pins = new Object();
+   piodb.gpio = new Object();
 
-   piodb.pins.data = "P9_11";
-   piodb.pins.clock = "P9_13";
-   piodb.pins.enable = "P9_14";
-   piodb.pins.latch = "P9_15";
+   piodb.pins.clock  =  4;
+   piodb.pins.data   = 27;
+   piodb.pins.enable = 17;
+   piodb.pins.latch  = 22;
 
-   piodb.pins.rain = "P9_15";
-   piodb.pins.edge = io.FALLING;
+   piodb.pins.rain = null;   // Not present on OSPi.
+   piodb.pins.button = null; // Not present on OSPi.
 
-   if (config.osbo) {
+   if (config.ospi) {
       // We need to go item by item so to not overwrite defaults.
-      if (config.osbo.data) {
-         piodb.pins.data = config.osbo.data;
+      if (config.ospi.data) {
+         piodb.pins.data = config.ospi.data;
       }
-      if (config.osbo.clock) {
-         piodb.pins.clock = config.osbo.clock;
+      if (config.ospi.clock) {
+         piodb.pins.clock = config.ospi.clock;
       }
-      if (config.osbo.enable) {
-         piodb.pins.enable = config.osbo.enable;
+      if (config.ospi.enable) {
+         piodb.pins.enable = config.ospi.enable;
       }
-      if (config.osbo.latch) {
-         piodb.pins.latch = config.osbo.latch;
+      if (config.ospi.latch) {
+         piodb.pins.latch = config.ospi.latch;
       }
-      if (config.osbo.rain) {
-         piodb.pins.rain = config.osbo.rain;
+      if (config.ospi.rain) {
+         piodb.pins.rain = config.ospi.rain;
       }
-      if (config.osbo.edge) {
-         piodb.pins.edge = config.osbo.edge;
+      if (config.ospi.button) {
+         piodb.pins.button = config.ospi.button;
       }
    }
 
-   io.pinMode(piodb.pins.rain, io.INPUT);
-   io.pinMode(piodb.pins.clock, io.OUTPUT);
-   io.pinMode(piodb.pins.enable, io.OUTPUT);
-   io.digitalWrite(piodb.pins.enable, io.HIGH);
-   io.pinMode(piodb.pins.data, io.OUTPUT);
-   io.pinMode(piodb.pins.latch, io.OUTPUT);
+   piodb.gpio.clock = new gpio (piodb.pins.clock, 'out');
+   piodb.gpio.enable = new gpio (piodb.pins.enable, 'out', 1);
+   piodb.gpio.data = new gpio (piodb.pins.data, 'out');
+   piodb.gpio.latch = new gpio (piodb.pins.latch, 'out');
+
+   if (piodb.pins.rain != null) {
+      piodb.gpio.rain = new gpio (piodb.pins.rain, 'in');
+   }
+   if (piodb.pins.button != null) {
+      piodb.gpio.button = new gpio (piodb.pins.button, 'in');
+   }
 
    var zonecount = user.zones.length;
    piodb.zones = new Array();
    for(var i = 0; i < zonecount; i++) {
       piodb.zones[i] = new Object();
-      piodb.zones[i].value = io.LOW;
+      piodb.zones[i].value = 0;
    }
    piodb.changed = true; // We do not know the status, assume the worst.
 }
 
 exports.info = function (attribute) {
-   return {id:"osbo",title:"Open Sprinkler OSBo Board",zones:{add:true,pin:false}};
+   return {id:"ospi",title:"Open Sprinkler OSPi Board (or compatible)",zones:{add:true,pin:false}};
 }
 
 exports.rainSensor = function () {
-   if (! piodb.pins) {
+   if (! piodb.gpio) {
       return false;
    }
-   if (! piodb.pins.rain) {
+   if (piodb.gpio.rain == null) {
       return false;
    }
-   if (io.digitalRead(piodb.pins.rain) > 0) {
+   if (piodb.gpio.rain.read() > 0) {
       return false;
    }
    return true;
 }
 
 exports.button = function () {
-   // No button on the OpenSprinkler OSBo board.
-   return false;
+   if (! piodb.gpio) {
+      return false;
+   }
+   if (piodb.gpio.button == null) {
+      return false;
+   }
+   if (piodb.gpio.button.read() > 0) {
+      return false;
+   }
+   return true;
 }
 
 exports.rainInterrupt = function (callback) {
-   if (! piodb.pins) {
-      return false;
-   }
-   if (! piodb.pins.rain) {
-      return null;
-   }
-   io.attachInterrupt(piodb.pins.rain, true, piodb.pins.edge, callback);
+   return null; // Useless.
 }
 
 exports.buttonInterrupt = function (callback) {
-   // No button on the OpenSprinkler OSBo board.
-   return null;
+   return null; // Useless.
 }
 
 exports.setZone = function (zone, on) {
@@ -237,9 +238,9 @@ exports.setZone = function (zone, on) {
       return null;
    }
    if (on) {
-      value = io.HIGH;
+      value = 1;
    } else {
-      value = io.LOW;
+      value = 0;
    }
    if (piodb.zones[zone].value != value) {
       debugLog ('Zone '+zone+' set to '+value);
@@ -255,29 +256,29 @@ exports.apply = function () {
    if (! piodb.changed) {
       return null;
    }
-   io.digitalWrite(piodb.pins.enable, io.HIGH);
+   piodb.gpio.enable.write (1);
 
-   io.digitalWrite(piodb.pins.clock, io.LOW);
-   io.digitalWrite(piodb.pins.latch, io.LOW);
+   piodb.gpio.clock.write (0);
+   piodb.gpio.latch.write (0);
 
    var zonecount = piodb.zones.length;
    var filler = (8 - (zonecount % 8)) % 8; // All bits missing in last byte.
 
    if (filler > 0) {
-      io.digitalWrite(piodb.pins.data,  io.LOW);
+      piodb.gpio.data.write (0);
       for(var i = filler; i > 0; i--) {
-         io.digitalWrite(piodb.pins.clock, io.LOW);
-         io.digitalWrite(piodb.pins.clock, io.HIGH);
+         piodb.gpio.clock.write (0);
+         piodb.gpio.clock.write (1);
       }
    }
    for(var i = zonecount - 1; i >= 0; i--) {
-      io.digitalWrite(piodb.pins.clock, io.LOW);
-      io.digitalWrite(piodb.pins.data,  piodb.zones[i].value);
-      io.digitalWrite(piodb.pins.clock, io.HIGH);
+      piodb.gpio.clock.write (0);
+      piodb.gpio.data.write (piodb.zones[i].value);
+      piodb.gpio.clock.write (1);
    }
-   io.digitalWrite(piodb.pins.latch, io.HIGH);
+   piodb.gpio.latch.write (1);
 
-   io.digitalWrite(piodb.pins.enable, io.LOW);
+   piodb.gpio.enable.write (0);
 
    piodb.changed = false;
 }

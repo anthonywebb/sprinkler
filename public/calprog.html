@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel=stylesheet type="text/css"
+      href="/sprinkler.css" title="Sprinkler">
+<script src="/sprinklerlib.js"></script>
+<script>
+window.onload = function() {
+
+   function getPrograms (callback) {
+      var command = new XMLHttpRequest();
+      command.open("GET", "/calendar/programs");
+      command.onreadystatechange = function () {
+         if (command.readyState === 4 && command.status === 200) {
+            var type = command.getResponseHeader("Content-Type");
+            callback((JSON.parse(command.responseText)));
+         }
+      }
+      command.send(null);
+   }
+
+   function programClick () {
+      var command = new XMLHttpRequest();
+      command.open("GET", "/program/C"+this.programindex+"/on");
+      command.send(null);
+   }
+
+   sprinklerInfo ();
+
+   getPrograms (function (programs) {
+      var buttons = document.getElementsByClassName ('sprkrbuttons')[0];
+      for (var i = 0; i < programs.length; i++) {
+         var outer = document.createElement("tr");
+         var inner = document.createElement("td");
+         var button = document.createElement("button");
+         button.programindex = i;
+         button.onclick = programClick;
+         button.innerHTML = programs[i].name;
+         inner.appendChild(button);
+         outer.appendChild(inner);
+         buttons.appendChild(outer);
+      }
+   });
+};
+</script>
+<head>
+   <title></title>
+</head>
+<body>
+   <table class="sprkrstatus">
+   <tr><td><span class="sprkrtitle">Calendar Programs</span></td></tr>
+   <tr><td>Controler:</td></tr>
+   <tr><td><span class="sprkrdata hostname"></span></td></tr>
+   <tr><td>Zone Status:</td></tr>
+   <tr><td><span class="sprkrdata activezone"></span></td></tr>
+   <tr><td>Program:</td></tr>
+   <tr><td><span class="sprkrdata activeprogram"></span></td></tr>
+   <tr><td>Rain delay:</td></tr>
+   <tr><td><span class="sprkrdata raindelay"></span></td></tr>
+   </table> <table align="right" class="sprkrbuttons"></table>
+</body>
+</html>
+

@@ -25,7 +25,7 @@
 //
 //   var weather = require('./weather');
 //
-//   weather.configure (config);
+//   weather.configure (config, options);
 //
 //      Initialize the weather module from the user configuration.
 //      This method can be called as often as necessary (typically
@@ -36,6 +36,16 @@
 //      Query the weather data service for updates. No refresh is
 //      executed if the last one was performed less than a defined
 //      interval (6 hours).
+//
+//   weather.status ();
+//
+//      Return the latest status of the weather data service: true if
+//      an update was successfully completed on the last attempt, false
+//      otherwise.
+//
+//   weather.updated ();
+//
+//      Return the time of the latest successful weather data update.
 //
 //   weather.temperature ();
 //
@@ -54,9 +64,9 @@
 //      return true if the current rain has reached the configured
 //      trigger level, false otherwise.
 //
-//   weather.adjustment ();
+//   weather.adjust (duration);
 //
-//      return the watering duration's weather adjustment.
+//      return the weather-adjusted watering duration.
 //
 // CONFIGURATION
 //
@@ -93,6 +103,12 @@ var maxadjust = 150;
 var raintrigger = null;
 var webRequest = null;
 
+var debugLog = function (text) {}
+
+function verboseLog (text) {
+   console.log ('[DEBUG] Weather: '+text);
+}
+
 function restoreDefaults () {
 
    url = null;
@@ -103,22 +119,25 @@ function restoreDefaults () {
 }
 restoreDefaults();
 
-exports.configure = function (config) {
+exports.configure = function (config, options) {
 
+   if (options && options.debug) {
+      debugLog = verboseLog;
+   }
    restoreDefaults();
 
-   if (config.weather == null) return;
-   if (config.weather.key == null) return;
+   if (! config.weather) return;
+   if (! config.weather.key) return;
 
    url = 'http://api.wunderground.com/api/'
                 + config.weather.key + '/yesterday/conditions/q/'
                 + config.zipcode + '.json';
 
-   if (config.weather.adjust != null) {
-      if (config.weather.adjust.min != null) {
+   if (config.weather.adjust) {
+      if (config.weather.adjust.min) {
          minadjust = config.weather.adjust.min;
       }
-      if (config.weather.adjust.max != null) {
+      if (config.weather.adjust.max) {
          maxadjust = config.weather.adjust.max;
       }
    }
@@ -136,7 +155,7 @@ function getWeather () {
    if (time < lastUpdate + updateInterval) return;
    lastUpdate = time;
 
-   console.log ('Weather: checking for update..');
+   debugLog ('checking for update..');
    received = "";
 
    webRequest = http.request(url, function(res) {
@@ -146,7 +165,8 @@ function getWeather () {
       res.on('end', function(d) {
          weatherConditions = JSON.parse(received);
          received = null;
-         console.log ('Weather: received update');
+         weatherConditions.updated = new Date();
+         debugLog ('received update');
       });
    });
    webRequest.on('error', function(e) {
@@ -159,27 +179,48 @@ function getWeather () {
 
 exports.refresh = function () {
 
-   if (url == null) return;
-   getWeather();
+   if (url) {
+      getWeather();
+   }
+}
+
+exports.status = function () {
+   if (weatherConditions) {
+      return true;
+   }
+   return false;
+}
+
+exports.updated = function () {
+   if (weatherConditions) {
+      return weatherConditions.updated;
+   }
+   return {};
 }
 
 exports.temperature = function () {
-   if (weatherConditions == null) return null;
-   return weatherConditions.history.dailysummary[0].meantempi - 0;
+   if (weatherConditions) {
+      return weatherConditions.history.dailysummary[0].meantempi - 0;
+   }
+   return null;
 }
 
 exports.humidity = function () {
-   if (weatherConditions == null) return null;
-   max = weatherConditions.history.dailysummary[0].maxhumidity - 0;
-   min = weatherConditions.history.dailysummary[0].minhumidity - 0;
-   return (max + min ) / 2;;
+   if (weatherConditions) {
+      max = weatherConditions.history.dailysummary[0].maxhumidity - 0;
+      min = weatherConditions.history.dailysummary[0].minhumidity - 0;
+      return (max + min ) / 2;;
+   }
+   return null;
 }
 
 exports.rain = function () {
-   if (weatherConditions == null) return null;
-   var precipi = weatherConditions.history.dailysummary[0].precipi - 0;
-   var today = weatherConditions.current_observation.precip_today_in - 0;
-   return precipi + today;
+   if (weatherConditions) {
+      var precipi = weatherConditions.history.dailysummary[0].precipi - 0;
+      var today = weatherConditions.current_observation.precip_today_in - 0;
+      return precipi + today;
+   }
+   return null;
 }
 
 exports.rainsensor = function () {
@@ -190,7 +231,7 @@ exports.rainsensor = function () {
 }
 
 // Adjustment formula derived from sprinklers_pi/weather.cpp
-exports.adjustment = function () {
+function adjustment () {
 
    if (weatherConditions == null) return 100;
 
@@ -206,20 +247,18 @@ exports.adjustment = function () {
    var precipi = history.precipi - 0;
    var precip_today_in = current.precip_today_in - 0;
 
-   // console.log ("Weather: current adjustment");
-   // console.log ("Weather: history.maxhumidity = "+history.maxhumidity);
-   // console.log ("Weather: history.minhumidity = "+history.minhumidity);
-   // console.log ("Weather: history.meantempi = "+history.meantempi);
-   // console.log ("Weather: history.precipi = "+history.precipi);
-   // console.log ("Weather: current.precip_today_in = "+current.precip_today_in);
-
    var humid_factor = 30 - ((maxhumidity + minhumidity) / 2);
    var temp_factor = (meantempi - 70) * 4;
    var rain_factor = 0.0 - ((precipi + precip_today_in) * 200.0);
 
-   var adjust =
-       Math.min(Math.max(minadjust, 100+humid_factor+temp_factor+rain_factor), maxadjust);
+   return 100+humid_factor+temp_factor+rain_factor;
+}
 
-   return adjust;
+exports.adjust = function (duration) {
+   if (weatherConditions == null) return duration;
+   var minadjusted = (duration * minadjust) / 100;
+   var maxadjusted = (duration * maxadjust) / 100;
+   var adjusted    = ((duration * adjustment()) + 50) / 100;
+   return Math.floor(Math.min(Math.max(minadjusted, adjusted), maxadjusted));
 }
 
