@@ -92,6 +92,7 @@ function sprinklerUpdate () {
                sprinklerSetContent ('humidity', ''+response.humidity+'%');
                sprinklerSetContent ('rain', ''+response.rain+' in');
                sprinklerSetContent ('rainsensor', response.rainsensor?'sensor ON':'sensor OFF');
+               sprinklerSetContent ('adjustment', ''+response.adjustment+'%');
             }
             weathercmd.send(null);
          }

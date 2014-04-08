@@ -33,8 +33,20 @@ window.onload = function() {
 
    function showParent (event) {
       if (event.parent)
-         return 'IN PROGRAM '+event.parent;
+         return 'PROGRAM '+event.parent;
       return 'MANUAL';
+   }
+
+   function showAdjustment (event) {
+      if (event.adjust != null) {
+         if (event.raw) {
+            var ratio = Math.floor((event.seconds * 100) / event.raw);
+            return 'ADJUST '+ratio+'% USING '+event.adjust;
+         } else {
+            return 'ADJUST USING '+event.adjust;
+         }
+      }
+      return 'NO ADJUST';
    }
 
    sprinklerUpdate();
@@ -84,6 +96,7 @@ window.onload = function() {
                   item = showZone(zones, event);
                   description = 'FOR '+sprinklerShowDuration(event.seconds);
                   description += ', '+showParent(event);
+                  description += ', '+showAdjustment(event);
                }
                break;
             case 'END':
