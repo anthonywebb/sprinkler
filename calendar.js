@@ -94,7 +94,7 @@ imported.updated = null;
 var pendingCalendar = null;
 
 var lastUpdate = 0
-var updateInterval = 12 * 3600000; // 12 hours in milliseconds.
+var updateInterval = 3600000; // 1 hour in milliseconds.
 
 var webRequest = null;
 

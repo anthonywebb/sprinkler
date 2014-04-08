@@ -325,7 +325,7 @@ app.get('/calendar/programs', function(req, res){
 
 app.get('/weather', function(req, res){
     if (weather.status()) {
-        res.json({status:'ok',hostname:os.hostname(),temperature:weather.temperature(),humidity:weather.humidity(),rain:weather.rain(),rainsensor:weather.rainsensor(),adjustment:weather.adjust(100)});
+        res.json({status:'ok',hostname:os.hostname(),temperature:weather.temperature(),humidity:weather.humidity(),rain:weather.rain(),rainsensor:weather.rainsensor(),adjustment:weather.adjustment()});
     } else {
         res.json({status:'ok'});    
     }
@@ -524,7 +524,8 @@ function programOn(program) {
         // typically for a zone with a problem (broken pipe, leak, etc).
         // This way one can avoid this zone without modifying all programs.
         //
-        if (config.zones[program.zones[i].zone].manual) {
+        var zoneconfig = config.zones[program.zones[i].zone];
+        if (zoneconfig.manual) {
            event.record({action: 'SKIP', zone:program.zones[i].zone-0, parent: program.name, seconds: 0});
            continue;
         }
@@ -532,24 +533,48 @@ function programOn(program) {
         var zone = program.zones[i].zone;
         var seconds = program.zones[i].seconds;
 
-        if (weather.status()) {
-            if (config.weather.enable) {
+        // Each zone may have its own predefined adjustment settings, or else
+        // use the "default" one. Use the weather adjustment only if there
+        // is no predefined adjustment settings for that zone and weather
+        // adjustment is enabled.
+
+        var adjustindex = zoneconfig.adjust;
+        if (adjustindex == null) {
+           adjustindex = "default";
+        }
+        var source = null;
+        var adjusted = seconds;
+        if (config.adjust != null) {
+            adjust = config.adjust[adjustindex];
+        }
+        if (adjust != null) {
+            // Predefined adjustments take priority.
+            if (adjust.monthly != null) {
+                var ratio = adjust.monthly[moment().month()];
+                adjusted = Math.floor(((seconds * ratio) + 50) / 100);
+                source = adjustindex+' (monthly)'
+            }
+        } else {
+            if (weather.enabled()) {
                 // Adjust the zone duration according to the weather.
                 // Note that we do not adjust a manual activation on
                 // a manual zone start: the user knows what he is doing.
                 //
-                seconds = weather.adjust(seconds);
+                adjusted = weather.adjust(seconds);
+                source = "WEATHER";
             }
         }
-        runqueue.push({zone:zone,seconds:seconds,parent:program.name});
+        if (source != null) {
+           runqueue.push({zone:zone,seconds:adjusted,raw:seconds,adjust:source,parent:program.name});
+        } else {
+           runqueue.push({zone:zone,seconds:seconds,parent:program.name});
+        }
     }
 
     if (weather.status()) {
-        if (config.weather.enable) {
-            event.record({action: 'START', program: program.name, temperature: weather.temperature(), humidity: weather.humidity(), rain: weather.rain(), adjustment: weather.adjust(100)});
-        } else {
-            event.record({action: 'START', program: program.name, temperature: weather.temperature(), humidity: weather.humidity(), rain: weather.rain()});
-        }
+
+        event.record({action: 'START', program: program.name, temperature: weather.temperature(), humidity: weather.humidity(), rain: weather.rain(), adjustment: weather.adjustment()});
+
     } else {
         event.record({action: 'START', program: program.name});
     }
@@ -600,7 +625,11 @@ function processQueue() {
             errorLog('Invalid zone '+running.zone);
             return;
         }
-        event.record({action: 'START', zone:running.zone-0, parent: running.parent, seconds: running.seconds});
+        if (running.adjust != null) {
+            event.record({action: 'START', zone:running.zone-0, parent: running.parent, seconds: running.seconds, adjust:running.adjust, raw:running.raw});
+        } else {
+            event.record({action: 'START', zone:running.zone-0, parent: running.parent, seconds: running.seconds});
+        }
 
         running.remaining = running.seconds;
 

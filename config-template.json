@@ -4,7 +4,7 @@
         "port": 8080
     },
     "zones": [
-        {"name":"Zone 1"},
+        {"name":"Zone 1", "adjust":"sand"},
         {"name":"Zone 2"},
         {"name":"Zone 3"},
         {"name":"Zone 4"},
@@ -27,6 +27,14 @@
     "raindelay": true,
     "production": false,
     "event": {"syslog": false, "cleanup": 90},
+    "adjust":{
+        "default":{
+            "monthly":[33,50,67,83,83,83,100,83,50,50,50,33]
+        },
+        "sand":{
+            "monthly":[40,40,60,80,80,80,100,80,40,40,40,40]
+        }
+    },
     "programs": [
         {
             "active":true,

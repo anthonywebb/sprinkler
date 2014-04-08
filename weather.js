@@ -47,6 +47,11 @@
 //
 //      Return the time of the latest successful weather data update.
 //
+//   weather.enabled ();
+//
+//      Return true if the weather adjustment feature is both enabled
+//      and data is available.
+//
 //   weather.temperature ();
 //
 //      return the average temperature for the previous day.
@@ -67,6 +72,11 @@
 //   weather.adjust (duration);
 //
 //      return the weather-adjusted watering duration.
+//
+//   weather.adjustment ();
+//
+//      return the raw weather adjustment ratio (not subject to mix/max
+//      limits).
 //
 // CONFIGURATION
 //
@@ -100,6 +110,7 @@ var updateInterval = 6 * 3600000; // 6 hours in milliseconds.
 var url = null;
 var minadjust = 30;
 var maxadjust = 150;
+var enable = false;
 var raintrigger = null;
 var webRequest = null;
 
@@ -112,9 +123,9 @@ function verboseLog (text) {
 function restoreDefaults () {
 
    url = null;
-   weatherConditions = null;
    minadjust = 30;
    maxadjust = 150;
+   enable = false;
    raintrigger = null;
 }
 restoreDefaults();
@@ -143,8 +154,18 @@ exports.configure = function (config, options) {
    }
 
    raintrigger = config.weather.raintrigger;
+   enable = config.weather.enable;
 
-   getWeather();
+   if (weatherConditions) {
+      // Force a refresh soon, but not immediately (to avoid consuming
+      // the quota too fast if the user makes small changes to the config).
+      // (Do it in 10 minutes.)
+      lastUpdate = new Date().getTime() - updateInterval + 600000;
+   } else {
+      // That is the first time we ask. Do it now.
+      lastUpdate = 0;
+      getWeather();
+   }
 }
 
 function getWeather () {
@@ -196,6 +217,13 @@ exports.updated = function () {
       return weatherConditions.updated;
    }
    return {};
+}
+
+exports.enabled = function () {
+   if (weatherConditions) {
+      return enable;
+   }
+   return false;
 }
 
 exports.temperature = function () {
@@ -251,7 +279,7 @@ function adjustment () {
    var temp_factor = (meantempi - 70) * 4;
    var rain_factor = 0.0 - ((precipi + precip_today_in) * 200.0);
 
-   return 100+humid_factor+temp_factor+rain_factor;
+   return Math.floor(100+humid_factor+temp_factor+rain_factor);
 }
 
 exports.adjust = function (duration) {
@@ -261,4 +289,6 @@ exports.adjust = function (duration) {
    var adjusted    = ((duration * adjustment()) + 50) / 100;
    return Math.floor(Math.min(Math.max(minadjusted, adjusted), maxadjusted));
 }
+
+exports.adjustment = adjustment;
 
