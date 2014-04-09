@@ -538,12 +538,14 @@ function programOn(program) {
         // is no predefined adjustment settings for that zone and weather
         // adjustment is enabled.
 
+        var source = null;
+        var adjusted = seconds;
+
         var adjustindex = zoneconfig.adjust;
         if (adjustindex == null) {
            adjustindex = "default";
         }
-        var source = null;
-        var adjusted = seconds;
+        var adjust = null;
         if (config.adjust != null) {
             adjust = config.adjust[adjustindex];
         }
