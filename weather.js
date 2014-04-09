@@ -279,7 +279,7 @@ function adjustment () {
    var temp_factor = (meantempi - 70) * 4;
    var rain_factor = 0.0 - ((precipi + precip_today_in) * 200.0);
 
-   return Math.floor(100+humid_factor+temp_factor+rain_factor);
+   return Math.floor(Math.max(0,100+humid_factor+temp_factor+rain_factor));
 }
 
 exports.adjust = function (duration) {
