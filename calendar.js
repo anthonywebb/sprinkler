@@ -30,7 +30,7 @@
 //
 //      Query the calendar servers for updates. A refresh is executed
 //      only if the last one was performed more than a defined interval
-//      (12 hours) ago, or if the configuration was changed.
+//      (every hour), or if the configuration was changed.
 //
 //   calendar.status ();
 //
@@ -93,8 +93,7 @@ imported.updated = null;
 
 var pendingCalendar = null;
 
-var lastUpdate = 0
-var updateInterval = 3600000; // 1 hour in milliseconds.
+var lastUpdateHour = null;
 
 var webRequest = null;
 
@@ -148,7 +147,7 @@ exports.configure = function (config, options) {
    }
 
    // Force access to the calendar on configuration change.
-   lastUpdate = new Date().getTime();
+   lastUpdateHour = new Date().getHours();
    loadNextCalendar();
 }
 
@@ -520,6 +519,32 @@ function loadFileCalendar () {
 }
 
 // --------------------------------------------------------------------------
+// Start the process of updating all calendars.
+//
+// Don't do anything if there is any pending request.
+//
+function loadCalendars () {
+
+   if (pendingCalendar != null) {
+      errorLog ('too early, calendar '+pendingCalendar+' is pending');
+      return;
+   }
+
+   for (var i = 0; i < imported.calendar.length; i++) {
+
+      if (imported.calendar[i].status == 'pending') {
+         errorLog ('too early, calendar '+pendingCalendar+' found pending');
+         return;
+      }
+   }
+
+   for (var i = 0; i < imported.calendar.length; i++) {
+      imported.calendar[i].status = 'idle';
+   }
+   loadNextCalendar();
+}
+
+// --------------------------------------------------------------------------
 // Initiate the GET request for the first 'idle' calendar.
 //
 // This is a recursive function that calls itself when processing is
@@ -545,7 +570,10 @@ function loadNextCalendar () {
 
    for (var i = 0; i < imported.calendar.length; i++) {
 
-      if (imported.calendar[i].status == 'pending') return; // Too early.
+      if (imported.calendar[i].status == 'pending') {
+         errorLog ('too early, calendar '+pendingCalendar+' found pending');
+         return;
+      }
       if (imported.calendar[i].status != 'idle') continue;
 
       infoLog ('importing calendar ' + imported.calendar[i].name);
@@ -592,13 +620,13 @@ exports.refresh = function () {
 
    if (imported.calendar.length == 0) return;
 
-   var time = new Date().getTime();
+   var hour = new Date().getHours();
 
    // Throttle when to request for information, to limit traffic.
-   if (time < lastUpdate + updateInterval) return;
-   lastUpdate = time;
+   if (hour == lastUpdateHour) return;
+   lastUpdateHour = hour;
 
-   loadNextCalendar();
+   loadCalendars();
 }
 
 // --------------------------------------------------------------------------

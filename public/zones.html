@@ -5,19 +5,11 @@
       href="/sprinkler.css" title="Sprinkler">
 <script src="/sprinklerlib.js"></script>
 <script>
-function zoneOff () {
-   var command = new XMLHttpRequest();
-   command.open("GET", "/off");
-   command.send(null);
+function zoneClick () {
+   sprinklerZoneOn(this.zoneindex, 60);
 }
 
 window.onload = function() {
-
-   function zoneClick () {
-      var command = new XMLHttpRequest();
-      command.open("GET", "/zone/"+this.zoneindex+"/on/60");
-      command.send(null);
-   }
 
    sprinklerInfo ();
 
@@ -51,7 +43,7 @@ window.onload = function() {
    <tr><td><span class="sprkrdata activeprogram"></span></td></tr>
    <tr><td>Rain delay:</td></tr>
    <tr><td><span class="sprkrdata raindelay"></span></td></tr>
-   </table> <table class="sprkrbuttons"><tr><td><button onclick="zoneOff()"><span class="zonename">All Off</span></button></td></tr></table>
+   </table> <table class="sprkrbuttons"><tr><td><button onclick="sprinklerOff()"><span class="zonename">All Zones Off</span></button></td></tr></table>
 </body>
 </html>
 

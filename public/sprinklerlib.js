@@ -16,12 +16,40 @@
 //      This function populates the page's title and all HTML items marked
 //      with known CSS class names with information from the controler:
 //
-//      hostname      the controler's host name.
-//      activezone    the currently active zone name, or else "Idle".
+//      hostname        the controler's host name.
+//      activezone      the currently active zone name, or else "Idle".
+//      activeprogram   the currently active program, or else "Idle".
+//      raindelay       'DISABLED', 'NONE' or remaining duration.
+//      weatherupdated  the time of the last weather update.
+//      temperature     the temperature in the last weather update.
+//      humidity        the humidity level in the last weather update.
+//      rain            the rain level in the last weather update.
+//      rainsensor      the state of the rain sensor (ON, OFF), as computed
+//                      from the last weather update.
+//      adjustment      the weather adjustment level, as computed from
+//                      the last weather update.
 //
 //   sprinklerConfig(callback);
 //
 //      This function retrieves the user configuration.
+//
+//   sprinklerStatus(callback);
+//
+//      This function retrieves the current status.
+//
+//   sprinklerZoneOn(index, duration);
+//
+//      This function requests the controler to start the specified zone
+//      for the specified duration.
+//
+//   sprinklerOff();
+//
+//      This function requests the controler to stop all zones (and programs).
+//
+//   sprinklerRefresh();
+//
+//      This function requests the controler to refresh all information
+//      from the outsid world: weather, calendar programs.
 //
 
 function sprinklerShowDuration (seconds) {
@@ -98,6 +126,15 @@ function sprinklerUpdate () {
          }
          sprinklerSetContent ('weatherupdated', content);
 
+         for (var i = 0; i < response.calendars.length; i++) {
+            content = new Date(response.calendars[i].updated).toLocaleString();
+            if (response.calendars[i].status) {
+               sprinklerSetContent ('calendar'+i, content);
+            } else {
+               sprinklerSetContent ('calendar'+i, 'NOT AVAILABLE');
+            }
+         }
+
          title = document.getElementsByClassName ('hostname');
          var title = 'Sprinkler Controler '+response.hostname;
          document.getElementsByTagName ('title')[0].innerHTML = title;
@@ -121,6 +158,37 @@ function sprinklerConfig (callback) {
          callback(config);
       }
    }
+   command.send(null);
+}
+
+function sprinklerStatus (callback) {
+   var command = new XMLHttpRequest();
+   command.open("GET", "/status");
+   command.onreadystatechange = function () {
+      if (command.readyState === 4 && command.status === 200) {
+         var status = JSON.parse(command.responseText);
+         // var type = command.getResponseHeader("Content-Type");
+         callback(status);
+      }
+   }
+   command.send(null);
+}
+
+function sprinklerZoneOn (index, duration) {
+   var command = new XMLHttpRequest();
+   command.open("GET", "/zone/"+index+"/on/"+duration);
+   command.send(null);
+}
+
+function sprinklerOff () {
+   var command = new XMLHttpRequest();
+   command.open("GET", "/off");
+   command.send(null);
+}
+
+function sprinklerRefresh () {
+   var command = new XMLHttpRequest();
+   command.open("GET", "/refresh");
    command.send(null);
 }
 
