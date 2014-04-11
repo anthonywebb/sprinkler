@@ -7,19 +7,6 @@
 <script>
 window.onload = function() {
 
-   function getHistory (zones, callback) {
-      var command = new XMLHttpRequest();
-      command.open("GET", "/history");
-      command.onreadystatechange = function () {
-         if (command.readyState === 4 && command.status === 200) {
-            var response = JSON.parse(command.responseText);
-            // var type = command.getResponseHeader("Content-Type");
-            callback(zones, response.history);
-         }
-      }
-      command.send(null);
-   }
-
    function newColumn (text, index) {
       var column = document.createElement("td");
       column.innerHTML = text;
@@ -49,16 +36,12 @@ window.onload = function() {
       return 'NO ADJUST';
    }
 
-   sprinklerUpdate();
-
    var lastEventId = null;
 
    function updateHistory(config) {
 
-      getHistory (config.zones, function (zones, history) {
-         if ((lastEventId != null) && (lastEventId == history[0]._id)) {
-            return;
-         }
+      sprinklerHistory (function (history) {
+
          lastEventId = history[0]._id;
 
          var table = document.getElementsByClassName ('sprkrevent')[0];
@@ -93,7 +76,7 @@ window.onload = function() {
                      description = 'NO WEATHER DATA';
                   }
                } else if (event.zone != null) {
-                  item = showZone(zones, event);
+                  item = showZone(config.zones, event);
                   description = 'FOR '+sprinklerShowDuration(event.seconds);
                   description += ', '+showParent(event);
                   description += ', '+showAdjustment(event);
@@ -104,20 +87,20 @@ window.onload = function() {
                if (event.program != null) {
                   item = 'PROGRAM '+event.program;
                } else if (event.zone != null) {
-                  item = showZone(zones, event);
+                  item = showZone(config.zones, event);
                   description = 'AFTER '+sprinklerShowDuration(event.runtime);
                   description += ', '+showParent(event);
                }
                break;
             case 'CANCEL':
                action = 'CANCEL';
-               item = showZone(zones, event);
+               item = showZone(config.zones, event);
                description = 'AFTER '+sprinklerShowDuration(event.runtime);
                description += ', '+showParent(event);
                break;
             case 'SKIP':
                action = 'SKIP';
-               item = showZone(zones, event);
+               item = showZone(config.zones, event);
                description = showParent(event);
                break;
             case 'STARTUP':
@@ -139,9 +122,19 @@ window.onload = function() {
       });
    }
 
+   function checkHistory (config) {
+      sprinklerLatestEvent (function (event) {
+         if ((lastEventId == null) || (lastEventId != event._id)) {
+            updateHistory (config);
+         }
+      });
+   }
+
+   sprinklerUpdate();
+
    sprinklerConfig (function (config) {
       updateHistory(config);
-      setInterval (function() {updateHistory(config)}, 5000);
+      setInterval (function() {checkHistory(config)}, 1000);
    });
 }
 </script>

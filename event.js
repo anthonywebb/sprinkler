@@ -37,6 +37,10 @@
 //      The callback function is called with one parameter, which is
 //      a JavaScript structure designed to be sent to a web client.
 //
+//   event.latest ();
+//
+//      Return the ID of the most recent event.
+//
 // USER CONFIGURATION
 //
 //   event.syslog        Enable (true) or disable (false) recording of events
@@ -65,6 +69,8 @@ var syslog_enabled = false;
 
 var latestDate = new Date(0);
 var latestSequence = 1;
+
+var latestId = null;
 
 var cleanup = 0;
 
@@ -99,7 +105,9 @@ exports.record = function (data) {
    db.insert(data, function (err, newDoc) {
       if(err){
          errorLog('Database insert error: '+err);
+         return;
       }
+      latestId = newDoc._id;
    });    
 
    if (syslog_enabled) {
@@ -149,5 +157,9 @@ exports.find = function (filter, callback) {
          callback({status: 'ok', history:docs});    
       }
    });
+}
+
+exports.latest = function () {
+   return latestId;
 }
 

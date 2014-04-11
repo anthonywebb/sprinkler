@@ -51,6 +51,14 @@
 //      This function requests the controler to refresh all information
 //      from the outsid world: weather, calendar programs.
 //
+//   sprinklerHistory(callback);
+//
+//      This function requests the complete history.
+//
+//   sprinklerLatestEvent(callback);
+//
+//      This function requests the ID of the latest event.
+//
 
 function sprinklerShowDuration (seconds) {
    var minutes = Math.floor(seconds / 60);
@@ -189,6 +197,32 @@ function sprinklerOff () {
 function sprinklerRefresh () {
    var command = new XMLHttpRequest();
    command.open("GET", "/refresh");
+   command.send(null);
+}
+
+function sprinklerHistory (callback) {
+   var command = new XMLHttpRequest();
+   command.open("GET", "/history");
+   command.onreadystatechange = function () {
+      if (command.readyState === 4 && command.status === 200) {
+         var response = JSON.parse(command.responseText);
+         // var type = command.getResponseHeader("Content-Type");
+         callback(response.history);
+      }
+   }
+   command.send(null);
+}
+
+function sprinklerLatestEvent (callback) {
+   var command = new XMLHttpRequest();
+   command.open("GET", "/history/latest");
+   command.onreadystatechange = function () {
+      if (command.readyState === 4 && command.status === 200) {
+         var event = JSON.parse(command.responseText);
+         // var type = command.getResponseHeader("Content-Type");
+         callback(event);
+      }
+   }
    command.send(null);
 }
 

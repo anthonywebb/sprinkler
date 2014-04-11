@@ -230,6 +230,13 @@ app.get('/history', function(req, res){
     });
 });
 
+app.get('/history/latest', function(req, res){
+    // Finding the latest historical event
+    // This is a way to tell if something new has happened and
+    // let the client know when to ask for all events (see /history).
+    res.json({_id:event.latest()});
+});
+
 app.get('/system/history', function(req, res){
     // Finding all the system events
     event.find({action: {$nin:['START', 'END', 'CANCEL']}}, function (response) {
@@ -474,6 +481,9 @@ setInterval(function(){
     });
 },6000);
 
+// Do not remove this event: one side effect is that it ensures that
+// there is always an event created, and thus we know the latest event.
+//
 event.record({action: 'STARTUP'});
 
 ///////////////////////////////////////
