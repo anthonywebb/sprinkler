@@ -52,7 +52,8 @@
 //   calendars             The calendar module configuration array.
 //
 //   calendars[n].format   Format of calendar data received. This module
-//                         only support format "iCalendar" for now.
+//                         only support format "iCalendar" for now, which
+//                         is also the default.
 //
 //   calendars[n].name     Base name for this calendar. The name is combined
 //                         with the name of each event to generate a unique
@@ -60,6 +61,11 @@
 //
 //   calendars[n].source   The address of the calendar server. This is
 //                         typically an URL.
+//
+//   calendars[n].disabled A boolean. The calendar entry is not used if true.
+//                         This is used to desactivate a calendar without
+//                         removing its (typically long) URL. The default
+//                         is false.
 
 var fs = require('graceful-fs');
 var moment = require('moment-timezone');
@@ -82,7 +88,7 @@ function verboseLog (text) {
 
 function UnsupportedCalendar (format) {
    this.format = format;
-   this.status = "error";
+   this.status = 'disabled';
 }
 
 var imported = new Object();
@@ -121,7 +127,16 @@ exports.configure = function (config, options) {
 
    for (var i = 0; i < config.calendars.length; i++) {
 
-      switch (config.calendars[i].format) {
+      var format = config.calendars[i].format;
+      if (! format)
+         format = "iCalendar";
+
+      if (config.calendars[i].disabled) {
+         imported.calendar[i] = new UnsupportedCalendar(format);
+         continue;
+      }
+
+      switch (format) {
 
       case "iCalendar":
          imported.calendar[i] = new ICalendar();
@@ -133,9 +148,8 @@ exports.configure = function (config, options) {
          break;
 
       default:
-         errorLog ('format '+config.calendars[i].format+' is not supported (in '+config.calendars[i].name+')');
-         imported.calendar[i] =
-            new UnsupportedCalendar(config.calendars[i].format);
+         errorLog ('format '+format+' is not supported (in '+config.calendars[i].name+')');
+         imported.calendar[i] = new UnsupportedCalendar(format);
          break;
       }
       imported.calendar[i].name = config.calendars[i].name;
@@ -328,7 +342,7 @@ function iCalendarToProgram (calendar_name, event) {
    var program = new Object();
    program.active = true;
    program.parent = calendar_name;
-   program.name = calendar_name + '/' + event.summary;
+   program.name = event.summary+'@'+calendar_name;
    program.start = start.format('HH:mm');
    program.date = start.format('YYYYMMDD');
 
@@ -539,7 +553,9 @@ function loadCalendars () {
    }
 
    for (var i = 0; i < imported.calendar.length; i++) {
-      imported.calendar[i].status = 'idle';
+      if (imported.calendar[i].status != 'disabled') {
+         imported.calendar[i].status = 'idle';
+      }
    }
    loadNextCalendar();
 }
@@ -602,7 +618,7 @@ function loadNextCalendar () {
       // The calendar source URL does not match any supported protocol.
 
       errorLog ('unsupported protocol for '+imported.calendar[i].name +" in '"+ imported.calendar[i].source + "'");
-      imported.calendar[i].status = 'error';
+      imported.calendar[i].status = 'disabled';
       imported.received = null;
    }
 
