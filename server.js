@@ -19,6 +19,7 @@ var runqueue = [];
 var currOn = 0;
 var buttonTimer = null;
 var lastScheduleCheck = null;
+var lastWeatherUpdateRecorded = 0;
 var zonecount = 0;
 var programcount = 0;
 
@@ -457,7 +458,12 @@ setInterval(function(){
 setInterval(function(){
     calendar.refresh();
     weather.refresh();
-},600000);
+    var update = weather.updated();
+    if (weather.status() && (update != lastWeatherUpdateRecorded)) {
+        event.record({action: 'WEATHER', temperature: weather.temperature(), humidity: weather.humidity(), rain: weather.rain(), adjustment: weather.adjustment()});
+        lastWeatherUpdateRecorded = update;
+    }
+},60000);
 
 // Start auto discovery UDP broadcast ping
 //

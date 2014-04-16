@@ -38,6 +38,27 @@ window.onload = function() {
 
    var lastEventId = null;
 
+   function weatherInfo (event, prefix) {
+      var description;
+      if (event.temperature != null) {
+         description = ''+prefix+' '+event.temperature+' F, '+event.humidity+'%';
+         if (event.rainsensor)
+            description = description+', RAINING';
+         else if (event.rain >= 0.01)
+            description = description+', '+event.rain+' in';
+         else
+            description = description+', NO RAIN';
+
+         if (event.adjustment != null)
+            description = description+', ADJUST '+event.adjustment+'%';
+         else
+            description = description+', DISABLED';
+      } else {
+         description = 'NO WEATHER DATA';
+      }
+      return description;
+   }
+
    function updateHistory(config) {
 
       sprinklerHistory (function (history) {
@@ -59,22 +80,7 @@ window.onload = function() {
                action = 'START';
                if (event.program != null) {
                   item = 'PROGRAM '+event.program;
-                  if (event.temperature != null) {
-                     description = 'WEATHER '+event.temperature+' F, '+event.humidity+'%';
-                     if (event.rainsensor)
-                        description = description+', RAINING';
-                     else if (event.rain >= 0.01)
-                        description = description+', '+event.rain+' in';
-                     else
-                        description = description+', NO RAIN';
-
-                     if (event.adjustment != null)
-                        description = description+', ADJUST '+event.adjustment+'%';
-                     else
-                        description = description+', DISABLED';
-                  } else {
-                     description = 'NO WEATHER DATA';
-                  }
+                  description = weatherInfo (event, 'WEATHER');
                } else if (event.zone != null) {
                   item = showZone(config.zones, event);
                   description = 'FOR '+sprinklerShowDuration(event.seconds);
@@ -110,6 +116,11 @@ window.onload = function() {
             case 'IDLE':
                action = 'IDLE';
                item = 'SYSTEM';
+               break;
+            case 'WEATHER':
+               action = 'UPDATE';
+               item = 'WEATHER';
+               description = weatherInfo (event, '');
                break;
             }
             var row = document.createElement("tr");
