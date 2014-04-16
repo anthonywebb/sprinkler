@@ -243,7 +243,7 @@ function getWeather () {
       if (toBeRefreshed(now)) {
          getWeatherNow();
       }
-   } else if (time < lastUpdate + updateInterval) {
+   } else if (time > lastUpdate + updateInterval) {
       getWeatherNow();
    }
 }

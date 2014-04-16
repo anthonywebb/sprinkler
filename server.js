@@ -459,7 +459,7 @@ setInterval(function(){
     calendar.refresh();
     weather.refresh();
     var update = weather.updated();
-    if (weather.status() && (update != lastWeatherUpdateRecorded)) {
+    if (weather.status() && (update > lastWeatherUpdateRecorded)) {
         event.record({action: 'WEATHER', temperature: weather.temperature(), humidity: weather.humidity(), rain: weather.rain(), adjustment: weather.adjustment()});
         lastWeatherUpdateRecorded = update;
     }
