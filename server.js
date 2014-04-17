@@ -694,7 +694,6 @@ function processQueue() {
         // once there is nothing left to process we can clear the timers
         zonesOff();
         clearTimers();
-        event.record({action: 'IDLE'});
     }
 }
 
