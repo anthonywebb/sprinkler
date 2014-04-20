@@ -9,11 +9,21 @@ window.onload = function() {
 
    function programClick () {
       var command = new XMLHttpRequest();
-      command.open("GET", "/program/"+this.programindex+"/on");
+      command.open("GET", "/program/"+this.programid+"/on");
       command.send(null);
    }
 
-   sprinklerInfo();
+   function getCalendarPrograms (callback) {
+      var command = new XMLHttpRequest();
+      command.open("GET", "/calendar/programs");
+      command.onreadystatechange = function () {
+         if (command.readyState === 4 && command.status === 200) {
+            var type = command.getResponseHeader("Content-Type");
+            callback((JSON.parse(command.responseText)));
+         }
+      }
+      command.send(null);
+   }
 
    sprinklerConfig (function (config) {
       var programs = config.programs;
@@ -22,13 +32,31 @@ window.onload = function() {
          var outer = document.createElement("tr");
          var inner = document.createElement("td");
          var button = document.createElement("button");
-         button.programindex = i;
+         button.programid = ''+i;
+         button.className = 'panelbutton';
          button.onclick = programClick;
          button.innerHTML = programs[i].name;
          inner.appendChild(button);
          outer.appendChild(inner);
          buttons.appendChild(outer);
       }
+
+      getCalendarPrograms (function (calprog) {
+         var buttons = document.getElementsByClassName ('sprkrbuttons')[0];
+         for (var i = 0; i < calprog.length; i++) {
+            var outer = document.createElement("tr");
+            var inner = document.createElement("td");
+            var button = document.createElement("button");
+            button.programid = 'C'+i;
+            button.className = 'panelbutton';
+            button.onclick = programClick;
+            button.innerHTML = calprog[i].name;
+            inner.appendChild(button);
+            outer.appendChild(inner);
+            buttons.appendChild(outer);
+         }
+         sprinklerInfo();
+      });
    });
 };
 </script>
@@ -36,17 +64,22 @@ window.onload = function() {
    <title></title>
 </head>
 <body>
+   <div class="sprkrpanel">
+   <div class="sprkrpane">
    <table class="sprkrstatus">
-   <tr><td><span class="sprkrtitle">Programs</span></td></tr>
-   <tr><td>Controler:</td></tr>
-   <tr><td><span class="sprkrdata hostname"></span></td></tr>
-   <tr><td>Zone Status:</td></tr>
-   <tr><td><span class="sprkrdata activezone"></span></td></tr>
-   <tr><td>Program:</td></tr>
-   <tr><td><span class="sprkrdata activeprogram"></span></td></tr>
-   <tr><td>Rain delay:</td></tr>
-   <tr><td><span class="sprkrdata raindelay"></span></td></tr>
-   </table> <table class="sprkrbuttons"></table>
+   <tr><td colspan="2"><span class="sprkrtitle">Program Manual Start</span></td></tr>
+   <tr><td>Controler:</td>
+   <td><span class="sprkrdata hostname"></span></td></tr>
+   <tr><td>Zone Status:</td>
+   <td><span class="sprkrdata activezone"></span></td></tr>
+   <tr><td>Program:</td>
+   <td><span class="sprkrdata activeprogram"></span></td></tr>
+   <tr><td>Rain delay:</td>
+   <td><span class="sprkrdata raindelay"></span></td></tr>
+   </table>
+   </div>
+   </div>
+   <table class="sprkrbuttons"><tr><td><button class="panelbutton" onclick="sprinklerOff()"><span class="zonename">All Zones Off</span></button></td></tr></table>
 </body>
 </html>
 
