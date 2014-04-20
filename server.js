@@ -357,37 +357,40 @@ function schedulePrograms (programs, currTime, currDay, d) {
         if (currTime != programs[i].start) continue;
         if (! programs[i].active) continue;
 
-        // Now check if the program should start today.
-        if (programs[i].days) {
-            // Runs weekly, on specific days of the week.
-            debugLog ('Checking day for program '+programs[i].name+' (weekly)');
-            if(programs[i].days.indexOf(currDay) != -1){
-                programOn(programs[i]);
-            }
-            continue;
+        // Check when the program starts (or started) to be active.
+        if (programs[i].date) {
+           var date = moment(programs[i].date+' '+currTime, 'YYYYMMDD HH:mm');
+           var delta = d.diff(date, 'days');
+           if (delta < 0) continue; // Starts at a future date.
+        } else {
+           delta = 0; // Force today.
         }
 
-        var date = moment(programs[i].date+' '+currTime, 'YYYYMMDD HH:mm');
-        var delta = d.diff(date, 'days');
-        if (delta < 0) continue; // Start at a future date.
+        // Now check if the program should be activated today.
+        switch (programs[i].repeat) {
+        case 'weekly':
+            // Runs weekly, on specific days of the week.
+            debugLog ('Checking day for program '+programs[i].name+' (weekly)');
+            if(programs[i].days[currDay]){
+                programOn(programs[i]);
+            }
+            break;
 
-        if (programs[i].interval) {
+        case 'daily':
             // Runs daily, at some day interval.
             debugLog ('Checking day for program '+programs[i].name+' (daily, interval='+programs[i].interval+', delta='+delta+')');
             if ((delta % programs[i].interval) == 0) {
                 programOn(programs[i]);
             }
-            continue;
-        }
-        // Otherwise, this program runs at the specified date (once).
-        debugLog ('Checking day for program '+programs[i].name+' (once, delta='+delta+')');
-        if (delta == 0) {
-            programOn(programs[i]);
-            programs[i].active = false; // Do not run it again.
-            continue;
-        }
-        if (delta > 0) {
-            programs[i].active = false; // Obsolete, do not run it anymore.
+            break;;
+
+        default:
+            // Otherwise, this program runs at the specified date (once).
+            debugLog ('Checking day for program '+programs[i].name+' (once, delta='+delta+')');
+            if (delta == 0) {
+                programOn(programs[i]);
+            }
+            programs[i].active = false; // Do not run it anymore.
         }
     }
 }

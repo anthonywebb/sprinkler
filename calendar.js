@@ -346,10 +346,13 @@ function iCalendarToProgram (calendar_name, event) {
    program.start = start.format('HH:mm');
    program.date = start.format('YYYYMMDD');
 
+   program.repeat = 'none'; // Default.
+
    if (event.rrule) {
       // Set the time of day, interval and day filter.
       switch (event.rrule.freq) {
       case 'DAILY':
+         program.repeat = 'daily';
          program.interval = event.rrule.interval;
          if (! program.interval) {
             program.interval = 1;
@@ -358,11 +361,12 @@ function iCalendarToProgram (calendar_name, event) {
 
       case 'WEEKLY':
          var days = event.rrule.byday.split(',');
-         program.days = new Array();
+         program.repeat = 'weekly';
+         program.days = [false, false, false, false, false, false, false];
          for (var k = 0; k < days.length; k++) {
             thisDay = iCalendarDaysDictionary.indexOf(days[k])
             if (thisDay >= 0) {
-               program.days[program.days.length] = thisDay;
+               program.days[thisDay] = true;
             } else {
                errorLog (days[k]+' is not a valid iCalendar day of the week');
             }
