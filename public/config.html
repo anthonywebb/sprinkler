@@ -339,6 +339,8 @@ function showOneProgram (programs, i, elements) {
          (showOneProgramString (programs, i, 'Name', 'name', '', 16));
       parameterstable.appendChild
          (showOneProgramString (programs, i, 'Start time', 'start', 'hh:mm', 10));
+      parameterstable.appendChild
+         (showOneProgramString (programs, i, 'Start date', 'date', 'yyyymmdd', 10));
 
       parameterstable.appendChild
          (showOneProgramRadio (programs, i, 'Daily', 'repeat', 'daily'));
