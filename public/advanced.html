@@ -6,14 +6,30 @@
 <script src="/sprinklerlib.js"></script>
 <script>
 window.onload = function() {
-   sprinklerInfo();
+
+   sprinklerStatus (function (status) {
+      var table = document.getElementsByClassName ('sprkrcalendar')[0];
+      for (var i = 0; i < status.calendars.length; i++) {
+         var outer = document.createElement("tr");
+         var inner = document.createElement("td");
+         inner.innerHTML = status.calendars[i].name+':';
+         outer.appendChild(inner);
+         inner = document.createElement("td");
+         inner.innerHTML = '<span class="sprkrdata calendar'+i+'"></span>';
+         outer.appendChild(inner);
+         table.appendChild(outer);
+      }
+      sprinklerInfo();
+   });
 }
 </script>
 <title></title>
 </head>
 <body>
+   <div class="sprkrpanel">
+   <div class="sprkrpane">
    <table class="sprkrstatus">
-   <tr><td><span class="sprkrtitle">Main Menu</span></td></tr>
+   <tr><td colspan="2"><span class="sprkrtitle">Advanced Menu</span></td></tr>
    <tr><td>Controler:</td>
    <td><span class="sprkrdata hostname"></span></td></tr>
    <tr><td>Zone Status:</td>
@@ -22,7 +38,13 @@ window.onload = function() {
    <td><span class="sprkrdata activeprogram"></span></td></tr>
    <tr><td>Rain delay:</td>
    <td><span class="sprkrdata raindelay"></span></td></tr>
-   <tr><td>Weather update:</td>
+   </table>
+   </div>
+   <br>
+   <div class="sprkrpane">
+   <table class="sprkrstatus">
+   <tr><td colspan="2"><span class="sprkrtitle">Weather</span></td></tr>
+   <tr><td>Updated:</td>
    <td><span class="sprkrdata weatherupdated"></span></td></tr>
    <tr><td>Temperature:</td>
    <td><span class="sprkrdata temperature"></span></td></tr>
@@ -32,6 +54,15 @@ window.onload = function() {
    <td><span class="sprkrdata rain"></span> (<span class="sprkrdata rainsensor"></span>)</td></tr>
    <tr><td>Raw adjustment:</td>
    <td><span class="sprkrdata adjustment"></span></td></tr>
+   </table>
+   </div>
+   <br>
+   <div class="sprkrpane">
+   <table class="sprkrstatus sprkrcalendar">
+   <tr><td colspan="2"><span class="sprkrtitle">Calendars</span></td></tr>
+   </table>
+   </div>
+   </div>
    </table> <table class="sprkrmenu">
    <tr><td class="sprkrmenucell"><A class="sprkrmenuitem" HREF="/status">Status</A></td></tr>
    <tr><td class="sprkrmenucell"><A class="sprkrmenuitem" HREF="/config">Configuration</A></td></tr>
