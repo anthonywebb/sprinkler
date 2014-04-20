@@ -109,8 +109,12 @@ function sprinklerUpdate () {
             content = 'NONE';
          } else {
             var deadline = new Date(response.raintimer).getTime();
-            var delta = Math.floor((new Date().getTime() - deadline) / 1000);
-            content = sprinklerShowDuration(delta);
+            var delta = Math.floor((deadline - new Date().getTime()) / 1000);
+            if (delta <= 0) {
+               content = 'NONE';
+            } else {
+               content = sprinklerShowDuration(delta);
+            }
          }
          sprinklerSetContent ('raindelay', content);
 
