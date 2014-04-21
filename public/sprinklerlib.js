@@ -29,6 +29,10 @@
 //      adjustment      the weather adjustment level, as computed from
 //                      the last weather update.
 //
+//   sprinklerOnOff();
+//
+//      This function toggles the sprinkler scheduler between on and off.
+//
 //   sprinklerConfig(callback);
 //
 //      This function retrieves the user configuration.
@@ -42,7 +46,7 @@
 //      This function requests the controler to start the specified zone
 //      for the specified duration.
 //
-//   sprinklerOff();
+//   sprinklerZoneOff();
 //
 //      This function requests the controler to stop all zones (and programs).
 //
@@ -99,6 +103,9 @@ function sprinklerUpdate () {
                content2 = response.running.parent;
             else
                content2 = 'MANUAL';
+         }
+         if (response.on == false) {
+            content2 = 'OFF';
          }
          sprinklerSetContent ('activezone', content);
          sprinklerSetContent ('activeprogram', content2);
@@ -186,15 +193,21 @@ function sprinklerStatus (callback) {
    command.send(null);
 }
 
+function sprinklerOnOff () {
+   var command = new XMLHttpRequest();
+   command.open("GET", "/onoff");
+   command.send(null);
+}
+
 function sprinklerZoneOn (index, duration) {
    var command = new XMLHttpRequest();
    command.open("GET", "/zone/"+index+"/on/"+duration);
    command.send(null);
 }
 
-function sprinklerOff () {
+function sprinklerZoneOff () {
    var command = new XMLHttpRequest();
-   command.open("GET", "/off");
+   command.open("GET", "/zone/off");
    command.send(null);
 }
 

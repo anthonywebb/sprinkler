@@ -91,7 +91,6 @@ function saveConfig (body) {
         }
         debugLog('Configuration saved successfully.');
         config = body;
-        activateConfig();
     });
 }
 
@@ -114,6 +113,10 @@ catch (err) {
     errorLog('There has been an error parsing the user config: '+err)
 } 
 
+if (config.on == null) {
+    config.on = true;
+}
+
 if (!config.weather) {
     config.weather = new Object();
     config.weather.enable = false;
@@ -131,30 +134,37 @@ app.use(express.static(__dirname+'/public'));
 app.use(missingHandler);
 
 // Routes
+
+// This URL is a way to enable/disable automatic watering completely.
+app.get('/onoff', function(req, res){
+    if (config.on == false) {
+        config.on = true;
+        res.json({status:'ok',hostname:os.hostname(),msg:'Watering enabled'});
+    } else {
+        config.on = false;
+        res.json({status:'ok',hostname:os.hostname(),msg:'Watering disabled'});
+    }
+    saveConfig (config);
+});
+
 app.get('/config', function(req, res){
     res.json(config);
 });
 
 app.post('/config', function(req, res){
     //debugLog(req.body);
-
     saveConfig (req.body);
-
+    activateConfig();
     res.json({status:'ok',msg:'config saved'});
 });
 
 app.get('/status', function(req, res){
     var now = new Date().getTime();
     if ((config.raindelay) && (now < rainTimer)) {
-       res.json({status:'ok',hostname:os.hostname(),weather:{enable:config.weather.enable,status:weather.status(),updated:weather.updated()},calendars:calendar.status(),raintimer:new Date(rainTimer),raindelay:config.raindelay,running:running,queue:runqueue});
+       res.json({status:'ok',on:config.on,hostname:os.hostname(),weather:{enable:config.weather.enable,status:weather.status(),updated:weather.updated()},calendars:calendar.status(),raintimer:new Date(rainTimer),raindelay:config.raindelay,running:running,queue:runqueue});
     } else {
-       res.json({status:'ok',hostname:os.hostname(),weather:{enable:config.weather.enable,status:weather.status(),updated:weather.updated()},calendars:calendar.status(),raindelay:config.raindelay,running:running,queue:runqueue});
+       res.json({status:'ok',on:config.on,hostname:os.hostname(),weather:{enable:config.weather.enable,status:weather.status(),updated:weather.updated()},calendars:calendar.status(),raindelay:config.raindelay,running:running,queue:runqueue});
     }
-});
-
-app.get('/off', function(req, res){
-    killQueue();
-    res.json({status:'ok',hostname:os.hostname(),msg:'all zones have been turned off'});
 });
 
 // This URL is to simulate the physical button.
@@ -298,6 +308,17 @@ app.get('/program/:id/full/history', function(req, res){
     }
 });
 
+app.get('/program/:id/on', function(req, res){
+    var program = retrieveProgramById (req.params.id);
+    if (program) {
+        programOn(program);
+        res.json({status:'ok',hostname:os.hostname(),msg:'started program: '+program.name});    
+    }
+    else {
+        errorHandler(res,''+req.params.id+' is not a valid program');
+    }
+});
+
 app.get('/zone/:id/history', function(req, res){
     // Finding all the history for this zone
     event.find({ zone: parseInt(req.params.id) }, function (response) {
@@ -316,15 +337,9 @@ app.get('/zone/:id/on/:seconds', function(req, res){
     }
 });
 
-app.get('/program/:id/on', function(req, res){
-    var program = retrieveProgramById (req.params.id);
-    if (program) {
-        programOn(program);
-        res.json({status:'ok',hostname:os.hostname(),msg:'started program: '+program.name});    
-    }
-    else {
-        errorHandler(res,''+req.params.id+' is not a valid program');
-    }
+app.get('/zone/off', function(req, res){
+    killQueue();
+    res.json({status:'ok',hostname:os.hostname(),msg:'all zones have been turned off'});
 });
 
 app.get('/calendar/programs', function(req, res){
@@ -398,6 +413,9 @@ function schedulePrograms (programs, currTime, currDay, d) {
 // Schedule all watering programs.
 //
 function scheduler () {
+
+    if (config.on == false) return;
+
     var d = moment().tz(config.timezone);
     var currTime = d.format('HH:mm');
     var currDay = parseInt(d.format('d'));

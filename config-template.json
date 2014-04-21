@@ -25,6 +25,7 @@
     "zipcode": "83406",
     "timezone": "America/Boise",
     "raindelay": true,
+    "on" = true,
     "production": false,
     "event": {"syslog": false, "cleanup": 90},
     "adjust":{
