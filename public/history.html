@@ -28,9 +28,9 @@ window.onload = function() {
       if (event.adjust != null) {
          if (event.raw) {
             var ratio = Math.floor((event.seconds * 100) / event.raw);
-            return 'ADJUST '+ratio+'% USING '+event.adjust;
+            return 'ADJUSTED '+ratio+'% USING '+event.adjust;
          } else {
-            return 'ADJUST USING '+event.adjust;
+            return 'ADJUSTED USING '+event.adjust;
          }
       }
       return 'NO ADJUST';
@@ -48,13 +48,17 @@ window.onload = function() {
             description = description+', '+event.rain+' in';
          else
             description = description+', NO RAIN';
-
-         if (event.adjustment != null)
-            description = description+', ADJUST '+event.adjustment+'%';
-         else
-            description = description+', DISABLED';
       } else {
          description = 'NO WEATHER DATA';
+      }
+
+      if (event.adjustment != null)
+         description = description+', ADJUST '+event.adjustment+'%';
+      else
+         description = description+', DISABLED';
+
+      if (event.source != null) {
+         description = description+' FROM '+event.source;
       }
       return description;
    }
@@ -118,8 +122,14 @@ window.onload = function() {
                item = 'SYSTEM';
                break;
             case 'WEATHER':
+               // This is for compatibility with existing logs only.
                action = 'UPDATE';
-               item = 'WEATHER';
+               item = event.action;
+               description = weatherInfo (event, '');
+               break;
+            case 'UPDATE':
+               action = 'UPDATE';
+               item = event.source;
                description = weatherInfo (event, '');
                break;
             }

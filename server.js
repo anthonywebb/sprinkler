@@ -9,6 +9,7 @@ var event = require('./event');
 var hardware = require('./hardware');
 var calendar = require('./calendar');
 var weather = require('./weather');
+var waterdex = require('./waterdex');
 
 
 // Some of our default vars
@@ -20,6 +21,7 @@ var currOn = 0;
 var buttonTimer = null;
 var lastScheduleCheck = null;
 var lastWeatherUpdateRecorded = 0;
+var lastWaterdexUpdateRecorded = 0;
 var zonecount = 0;
 var programcount = 0;
 
@@ -76,6 +78,7 @@ function activateConfig () {
     hardware.buttonInterrupt (buttonCallback);
     calendar.configure(config, options);
     weather.configure(config, options);
+    waterdex.configure(config, options);
     // Calculate the real counts from the configuration we loaded.
     resetCounts();
 }
@@ -122,6 +125,11 @@ if (!config.weather) {
     config.weather.enable = false;
 }
 
+if (!config.waterdex) {
+    config.waterdex = new Object();
+    config.waterdex.enable = false;
+}
+
 
 ///////////////////////////////////////
 // CONFIGURE THE WEBSERVER
@@ -160,11 +168,31 @@ app.post('/config', function(req, res){
 
 app.get('/status', function(req, res){
     var now = new Date().getTime();
+    var response = {
+        status:'ok',
+        on:config.on,
+        hostname:os.hostname(),
+        weather:{
+            enable:weather.enabled(),
+            status:weather.status(),
+            updated:weather.updated(),
+            adjustment:weather.adjustment()
+        },
+        waterdex:{
+            enable:waterdex.enabled(),
+            status:waterdex.status(),
+            updated:waterdex.updated(),
+            adjustment:waterdex.adjustment()
+        },
+        calendars:calendar.status(),
+        raindelay:config.raindelay,
+        running:running,
+        queue:runqueue
+    };
     if ((config.raindelay) && (now < rainTimer)) {
-       res.json({status:'ok',on:config.on,hostname:os.hostname(),weather:{enable:config.weather.enable,status:weather.status(),updated:weather.updated()},calendars:calendar.status(),raintimer:new Date(rainTimer),raindelay:config.raindelay,running:running,queue:runqueue});
-    } else {
-       res.json({status:'ok',on:config.on,hostname:os.hostname(),weather:{enable:config.weather.enable,status:weather.status(),updated:weather.updated()},calendars:calendar.status(),raindelay:config.raindelay,running:running,queue:runqueue});
+       response.raintimer = new Date(rainTimer);
     }
+    res.json(response);
 });
 
 // This URL is to simulate the physical button.
@@ -225,6 +253,22 @@ app.get('/weather/:flag', function(req, res){
     }
     if (old != config.weather.enable) {
         saveConfig (config);
+    }
+});
+
+// This URL is a way to enable/disable the waterdex adjustment feature.
+app.get('/waterdex/:flag', function(req, res){
+    var old = config.waterdex.enable;
+    if (req.params.flag == 'true') {
+        config.waterdex.enable = true;
+        res.json({status:'ok',hostname:os.hostname(),msg:'Waterdex adjustment enabled'});
+    } else {
+        config.waterdex.enable = false;
+        res.json({status:'ok',hostname:os.hostname(),msg:'Waterdex adjustment disabled'});
+    }
+    if (old != config.waterdex.enable) {
+        saveConfig (config);
+        waterdex.configure (config, options);
     }
 });
 
@@ -479,10 +523,16 @@ setInterval(function(){
 setInterval(function(){
     calendar.refresh();
     weather.refresh();
+    waterdex.refresh();
     var update = weather.updated();
     if (weather.status() && (update > lastWeatherUpdateRecorded)) {
-        event.record({action: 'WEATHER', temperature: weather.temperature(), humidity: weather.humidity(), rain: weather.rain(), adjustment: weather.adjustment()});
+        event.record({action: 'UPDATE', source:'WEATHER', temperature: weather.temperature(), humidity: weather.humidity(), rain: weather.rain(), adjustment: weather.adjustment()});
         lastWeatherUpdateRecorded = update;
+    }
+    update = waterdex.updated();
+    if (waterdex.status() && (update > lastWaterdexUpdateRecorded)) {
+        event.record({action: 'UPDATE', source:'WATERDEX', adjustment: waterdex.adjustment()});
+        lastWaterdexUpdateRecorded = update;
     }
 },60000);
 
@@ -594,7 +644,11 @@ function programOn(program) {
                 source = adjustindex+' (monthly)'
             }
         } else {
-            if (weather.enabled()) {
+            if (waterdex.enabled()) {
+                // Adjust the zone duration according to the Waterdex index.
+                adjusted = waterdex.adjust(seconds);
+                source = "WATERDEX";
+            } else if (weather.enabled()) {
                 // Adjust the zone duration according to the weather.
                 // Note that we do not adjust a manual activation on
                 // a manual zone start: the user knows what he is doing.
@@ -610,13 +664,22 @@ function programOn(program) {
         }
     }
 
-    if (weather.status()) {
+    var logentry = {
+        action: 'START',
+        program: program.name
+    };
 
-        event.record({action: 'START', program: program.name, temperature: weather.temperature(), humidity: weather.humidity(), rain: weather.rain(), adjustment: weather.adjustment()});
-
-    } else {
-        event.record({action: 'START', program: program.name});
+    if (waterdex.status()) {
+        logentry.adjustment = waterdex.adjustment();
+        logentry.source = 'WATERDEX';
+    } else if (weather.status()) {
+        logentry.temperature = weather.temperature();
+        logentry.humidity = weather.humidity();
+        logentry.rain = weather.rain();
+        logentry.adjustment = weather.adjustment();
+        logentry.source = 'WEATHER';
     }
+    event.record(logentry);
     processQueue();
 }
 

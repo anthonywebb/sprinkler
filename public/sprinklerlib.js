@@ -125,10 +125,15 @@ function sprinklerUpdate () {
          }
          sprinklerSetContent ('raindelay', content);
 
-         if ((response.weather == null) || (! response.weather.status)) {
-            content = 'NOT AVAILABLE';
-         } else {
+         if ((response.waterdex) && (response.waterdex.status)) {
+            content = new Date(response.waterdex.updated).toLocaleString();
+            sprinklerSetContent ('weatherupdated', content);
+            sprinklerSetContent ('adjustment',
+                                 ''+response.waterdex.adjustment+'%');
+            sprinklerSetContent ('rainsensor', 'NOT AVAILABLE');
+         } else if ((response.weather) && (response.weather.status)) {
             content = new Date(response.weather.updated).toLocaleString();
+            sprinklerSetContent ('weatherupdated', content);
 
             var weathercmd = new XMLHttpRequest();
             weathercmd.open("GET", "/weather");
@@ -142,8 +147,9 @@ function sprinklerUpdate () {
                sprinklerSetContent ('adjustment', ''+response.adjustment+'%');
             }
             weathercmd.send(null);
+         } else {
+            sprinklerSetContent ('weatherupdated', 'NOT AVAILABLE');
          }
-         sprinklerSetContent ('weatherupdated', content);
 
          for (var i = 0; i < response.calendars.length; i++) {
             content = new Date(response.calendars[i].updated).toLocaleString();

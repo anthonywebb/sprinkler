@@ -156,6 +156,12 @@ exports.configure = function (config, options) {
    if (! config.weather) return;
    if (! config.weather.key) return;
 
+   enable = config.weather.enable;
+   if (!enable) {
+      weatherConditions = null;
+      return;
+   }
+
    url = 'http://api.wunderground.com/api/'
                 + config.weather.key + '/yesterday/conditions/q/'
                 + config.zipcode + '.json';
@@ -196,7 +202,6 @@ exports.configure = function (config, options) {
    }
 
    raintrigger = config.weather.raintrigger;
-   enable = config.weather.enable;
 
    if (weatherConditions) {
       // Force a refresh soon, but not immediately (to avoid consuming
