@@ -9,7 +9,7 @@ var event = require('./event');
 var hardware = require('./hardware');
 var calendar = require('./calendar');
 var weather = require('./weather');
-var waterdex = require('./waterdex');
+var wateringindex = require('./wateringindex');
 
 
 // Some of our default vars
@@ -21,7 +21,7 @@ var currOn = 0;
 var buttonTimer = null;
 var lastScheduleCheck = null;
 var lastWeatherUpdateRecorded = 0;
-var lastWaterdexUpdateRecorded = 0;
+var lastWateringIndexUpdateRecorded = 0;
 var zonecount = 0;
 var programcount = 0;
 
@@ -78,7 +78,7 @@ function activateConfig () {
     hardware.buttonInterrupt (buttonCallback);
     calendar.configure(config, options);
     weather.configure(config, options);
-    waterdex.configure(config, options);
+    wateringindex.configure(config, options);
     // Calculate the real counts from the configuration we loaded.
     resetCounts();
 }
@@ -125,9 +125,9 @@ if (!config.weather) {
     config.weather.enable = false;
 }
 
-if (!config.waterdex) {
-    config.waterdex = new Object();
-    config.waterdex.enable = false;
+if (!config.wateringindex) {
+    config.wateringindex = new Object();
+    config.wateringindex.enable = false;
 }
 
 
@@ -178,11 +178,11 @@ app.get('/status', function(req, res){
             updated:weather.updated(),
             adjustment:weather.adjustment()
         },
-        waterdex:{
-            enable:waterdex.enabled(),
-            status:waterdex.status(),
-            updated:waterdex.updated(),
-            adjustment:waterdex.adjustment()
+        wateringindex:{
+            enable:wateringindex.enabled(),
+            status:wateringindex.status(),
+            updated:wateringindex.updated(),
+            adjustment:wateringindex.adjustment()
         },
         calendars:calendar.status(),
         raindelay:config.raindelay,
@@ -256,19 +256,19 @@ app.get('/weather/:flag', function(req, res){
     }
 });
 
-// This URL is a way to enable/disable the waterdex adjustment feature.
-app.get('/waterdex/:flag', function(req, res){
-    var old = config.waterdex.enable;
+// This URL is a way to enable/disable the watering index adjustment feature.
+app.get('/wateringindex/:flag', function(req, res){
+    var old = config.wateringindex.enable;
     if (req.params.flag == 'true') {
-        config.waterdex.enable = true;
-        res.json({status:'ok',hostname:os.hostname(),msg:'Waterdex adjustment enabled'});
+        config.wateringindex.enable = true;
+        res.json({status:'ok',hostname:os.hostname(),msg:'Watering Index adjustment enabled'});
     } else {
-        config.waterdex.enable = false;
-        res.json({status:'ok',hostname:os.hostname(),msg:'Waterdex adjustment disabled'});
+        config.wateringindex.enable = false;
+        res.json({status:'ok',hostname:os.hostname(),msg:'Watering Index adjustment disabled'});
     }
-    if (old != config.waterdex.enable) {
+    if (old != config.wateringindex.enable) {
         saveConfig (config);
-        waterdex.configure (config, options);
+        wateringindex.configure (config, options);
     }
 });
 
@@ -523,16 +523,16 @@ setInterval(function(){
 setInterval(function(){
     calendar.refresh();
     weather.refresh();
-    waterdex.refresh();
+    wateringindex.refresh();
     var update = weather.updated();
     if (weather.status() && (update > lastWeatherUpdateRecorded)) {
         event.record({action: 'UPDATE', source:'WEATHER', temperature: weather.temperature(), humidity: weather.humidity(), rain: weather.rain(), adjustment: weather.adjustment()});
         lastWeatherUpdateRecorded = update;
     }
-    update = waterdex.updated();
-    if (waterdex.status() && (update > lastWaterdexUpdateRecorded)) {
-        event.record({action: 'UPDATE', source:'WATERDEX', adjustment: waterdex.adjustment()});
-        lastWaterdexUpdateRecorded = update;
+    update = wateringindex.updated();
+    if (wateringindex.status() && (update > lastWateringIndexUpdateRecorded)) {
+        event.record({action: 'UPDATE', source:wateringindex.source(), adjustment: wateringindex.adjustment()});
+        lastWateringIndexUpdateRecorded = update;
     }
 },60000);
 
@@ -644,10 +644,10 @@ function programOn(program) {
                 source = adjustindex+' (monthly)'
             }
         } else {
-            if (waterdex.enabled()) {
-                // Adjust the zone duration according to the Waterdex index.
-                adjusted = waterdex.adjust(seconds);
-                source = "WATERDEX";
+            if (wateringindex.enabled()) {
+                // Adjust the zone duration according to the watering index.
+                adjusted = wateringindex.adjust(seconds);
+                source = wateringindex.source();
             } else if (weather.enabled()) {
                 // Adjust the zone duration according to the weather.
                 // Note that we do not adjust a manual activation on
@@ -669,9 +669,9 @@ function programOn(program) {
         program: program.name
     };
 
-    if (waterdex.status()) {
-        logentry.adjustment = waterdex.adjustment();
-        logentry.source = 'WATERDEX';
+    if (wateringindex.status()) {
+        logentry.adjustment = wateringindex.adjustment();
+        logentry.source = wateringindex.source();
     } else if (weather.status()) {
         logentry.temperature = weather.temperature();
         logentry.humidity = weather.humidity();

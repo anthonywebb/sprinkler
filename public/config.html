@@ -104,7 +104,7 @@ function addZone () {
    forceVisible(elements);
 }
 
-function showOneWeatherRefresh (weather, i, elements) {
+function showOneRefreshSchedule (weather, i, elements, name) {
 
    for (var k = 0; k < elements.length; k++) {
       var outer = document.createElement("tr");
@@ -113,7 +113,7 @@ function showOneWeatherRefresh (weather, i, elements) {
       var timeinput = document.createElement("input");
       timeinput.type = 'text';
       timeinput.size = 6;
-      timeinput.name = 'wrefresh_'+i;
+      timeinput.name = name+'refresh_'+i;
       timeinput.value = weather.refresh[i];
       timeinput.placeholder = 'hh:mm';
       timecolumn.appendChild(timeinput);
@@ -123,20 +123,33 @@ function showOneWeatherRefresh (weather, i, elements) {
    }
 }
 
+function addRefreshSchedule (data, name) {
+
+   if (! data.refresh) {
+      data.refresh = new Array();
+   }
+   var i = data.refresh.length;
+   data.refresh[i] = '';
+
+   var elements = document.getElementsByName(name+'refreshtable');
+   showOneRefreshSchedule (data, i, elements);
+   forceVisible(elements);
+}
+
 function addWeatherRefresh () {
 
    if (! editing.weather) {
       editing.weather = new Object();
    }
-   if (! editing.weather.refresh) {
-      editing.weather.refresh = new Array();
-   }
-   var i = editing.weather.refresh.length;
-   editing.weather.refresh[i] = '';
+   addRefreshSchedule (editing.weather, 'weather');
+}
 
-   var elements = document.getElementsByName('weatherrefreshtable');
-   showOneWeatherRefresh (editing.weather, i, elements);
-   forceVisible(elements);
+function addWaterIndexRefresh () {
+
+   if (! editing.wateringindex) {
+      editing.wateringindex = new Object();
+   }
+   addRefreshSchedule (editing.wateringindex, 'waterindex');
 }
 
 function showOneCalendar (calendars, i, elements) {
@@ -270,7 +283,6 @@ function showOneProgramRadio (programs, i, label, name, value) {
    checkbox.type = 'radio';
    checkbox.name = 'editing.programs['+i+'].'+name;
    checkbox.onchange = function () {
-console.log ('onChange called for '+i);
       if (this.checked) {
          editing.programs[i].repeat = this.value;
       }
@@ -526,12 +538,12 @@ window.onload = function() {
       }
    }
 
-   function showExistingWeatherRefresh (weather) {
-      if (! weather) return;
-      var elements = document.getElementsByName('weatherrefreshtable');
-      if (weather.refresh) {
-         for (var i = 0; i < weather.refresh.length; i++) {
-            showOneWeatherRefresh (weather, i, elements);
+   function showExistingRefreshSchedule (data, name) {
+      if (! data) return;
+      if (data.refresh) {
+         var elements = document.getElementsByName(name+'refreshtable');
+         for (var i = 0; i < data.refresh.length; i++) {
+            showOneRefreshSchedule (data, i, elements, name);
          }
       }
    }
@@ -549,14 +561,14 @@ window.onload = function() {
       showExistingPrograms (config.programs);
       showExistingAdjust (config.adjust);
       showExistingCalendars (config.calendars);
-      showExistingWeatherRefresh (config.weather);
+      showExistingRefreshSchedule (config.weather, 'weather');
+      showExistingRefreshSchedule (config.wateringindex, 'waterindex');
 
       showInput ("eventcleanup", config.event.cleanup);
       showCheckbox ("eventsyslog", config.event.syslog);
 
       if (config.weather) {
          showCheckbox ("weatherenable", config.weather.enable);
-         showInput ("weatherrefresh", config.weather.refresh);
          if (config.weather.adjust) {
             showInput ("weathermin", config.weather.adjust.min);
             showInput ("weathermax", config.weather.adjust.max);
@@ -566,6 +578,14 @@ window.onload = function() {
          }
          showInput ("weatherkey", config.weather.key);
          showInput ("weatherrain", config.weather.raintrigger);
+      }
+      if (config.wateringindex) {
+         showCheckbox ("waterindexenable", config.wateringindex.enable);
+         showInput ("waterindexprov", config.wateringindex.provider);
+         if (config.wateringindex.adjust) {
+            showInput ("waterindexmin", config.wateringindex.adjust.min);
+            showInput ("waterindexmax", config.wateringindex.adjust.max);
+         }
       }
    });
 
@@ -729,6 +749,38 @@ window.onload = function() {
         <tr>
            <td>Sensitivity:</td>
            <td><input type="text" name="weathersens" placeholder="%"></td>
+        </tr>
+     </table>
+   </form>
+   </div>
+   <br>
+   <button class="addbutton" onclick="addWaterIndexRefresh()">Add</button>
+   <button class="configbuttonwithadd" onclick="visible('configwaterindex')">Watering Index Service</button>
+   <br>
+   <div name="configwaterindex" class="hidable" display="none">
+   <form name="sprkrconfig">
+     <table>
+        <tr>
+           <td></td>
+           <td><input type="checkbox" name="waterindexenable"> Allow adjustments based on watering index</td>
+        </tr>
+        <tr>
+           <td>Provider:</td>
+           <td><input type="text" size="3" name="waterindexprov" placeholder="Name"></td>
+        </tr>
+        <tr>
+           <td style="vertical-align:top">Refresh times:</td>
+           <td>
+              <table name="waterindexrefreshtable"></table>
+           </td>
+        </tr>
+        <tr>
+           <td>Minimal adjustment:</td>
+           <td><input type="text" size="3" name="waterindexmin" placeholder="%"></td>
+        </tr>
+        <tr>
+           <td>Maximal adjustment:</td>
+           <td><input type="text" size="3" name="waterindexmax" placeholder="%"></td>
         </tr>
      </table>
    </form>
