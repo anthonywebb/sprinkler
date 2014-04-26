@@ -138,6 +138,7 @@ function restoreDefaults () {
    raintrigger = null;
    refreshSchedule = new Array();;
 
+   adjustParameters.enable = true;
    adjustParameters.min = 30;
    adjustParameters.max = 150;
    adjustParameters.humidity = 30;
@@ -184,19 +185,22 @@ exports.configure = function (config, options) {
    }
 
    if (config.weather.adjust) {
-      if (config.weather.adjust.min) {
+      if (config.weather.adjust.enable !== undefined) {
+         adjustParameters.enable = config.weather.adjust.enable;
+      }
+      if (config.weather.adjust.min !== undefined) {
          adjustParameters.min = config.weather.adjust.min - 0;
       }
-      if (config.weather.adjust.max) {
+      if (config.weather.adjust.max !== undefined) {
          adjustParameters.max = config.weather.adjust.max - 0;
       }
-      if (config.weather.adjust.temperature) {
+      if (config.weather.adjust.temperature !== undefined) {
          adjustParameters.temperature = config.weather.adjust.temperature - 0;
       }
-      if (config.weather.adjust.humidity) {
+      if (config.weather.adjust.humidity !== undefined) {
          adjustParameters.humidity = config.weather.adjust.humidity - 0;
       }
-      if (config.weather.adjust.sensitivity) {
+      if (config.weather.adjust.sensitivity !== undefined) {
          adjustParameters.sensitivity = config.weather.adjust.sensitivity - 0;
       }
    }
@@ -302,7 +306,7 @@ exports.updated = function () {
 
 exports.enabled = function () {
    if (weatherConditions) {
-      return enable;
+      return adjustParameters.enable;
    }
    return false;
 }
@@ -359,6 +363,7 @@ function adjustment () {
 
 exports.adjust = function (duration) {
    if (weatherConditions == null) return duration;
+   if (! adjustParameters.enable) return duration;
    var minadjusted = ((duration * adjustParameters.min) + 50) / 100;
    var maxadjusted = ((duration * adjustParameters.max) + 50) / 100;
    var adjusted    = ((duration * adjustment()) + 50) / 100;

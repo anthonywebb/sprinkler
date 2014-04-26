@@ -570,6 +570,7 @@ window.onload = function() {
       if (config.weather) {
          showCheckbox ("weatherenable", config.weather.enable);
          if (config.weather.adjust) {
+            showCheckbox ("weatheradjustenable", config.weather.adjust.enable);
             showInput ("weathermin", config.weather.adjust.min);
             showInput ("weathermax", config.weather.adjust.max);
             showInput ("weathertemp", config.weather.adjust.temperature);
@@ -714,7 +715,7 @@ window.onload = function() {
      <table>
         <tr>
            <td></td>
-           <td><input type="checkbox" name="weatherenable"> Allow adjustments based on weather conditions</td>
+           <td><input type="checkbox" name="weatherenable"> Query weather conditions</td>
         </tr>
         <tr>
            <td>Key:</td>
@@ -727,16 +728,20 @@ window.onload = function() {
            </td>
         </tr>
         <tr>
+           <td>Rain delay trigger:</td>
+           <td><input type="text" name="weatherrain" placeholder="Inches"></td>
+        </tr>
+        <tr>
+           <td></td>
+           <td><input type="checkbox" name="weatheradjustenable"> Allow adjustments based on weather conditions</td>
+        </tr>
+        <tr>
            <td>Minimal adjustment:</td>
            <td><input type="text" size="3" name="weathermin" placeholder="%"></td>
         </tr>
         <tr>
            <td>Maximal adjustment:</td>
            <td><input type="text" size="3" name="weathermax" placeholder="%"></td>
-        </tr>
-        <tr>
-           <td>Rain delay trigger:</td>
-           <td><input type="text" name="weatherrain" placeholder="Inches"></td>
         </tr>
         <tr>
            <td>Base temperature:</td>
