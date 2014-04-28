@@ -59,6 +59,8 @@
 //                         with the name of each event to generate a unique
 //                         watering program name.
 //
+//   calendars[n].season   The season when this calendar is active.
+//
 //   calendars[n].source   The address of the calendar server. This is
 //                         typically an URL.
 //
@@ -153,6 +155,9 @@ exports.configure = function (config, options) {
          break;
       }
       imported.calendar[i].name = config.calendars[i].name;
+      if (config.calendars[i].season) {
+         imported.calendar[i].season = config.calendars[i].season;
+      }
       imported.calendar[i].source = config.calendars[i].source;
    }
    imported.location = config.location;
@@ -428,6 +433,9 @@ ICalendar.prototype.import = function (text) {
 
       var program = iCalendarToProgram (pendingCalendar.name, events[i]);
       if (program != null) {
+         if (pendingCalendar.season) {
+            program.season = pendingCalendar.season;
+         }
          var is_new_program = true;
          for (var j = 0; j < imported.programs.length; j++) {
             if (imported.programs[j].name == program.name) {

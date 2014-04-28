@@ -72,6 +72,7 @@ var latestSequence = 1;
 
 var latestId = null;
 
+const oneDay = 86400000;
 var cleanup = 0;
 
 // load up the database
@@ -133,7 +134,7 @@ exports.record = function (data) {
    // Cleanup old events.
    if (cleanup) {
       if (latestSequence === 1) {
-         var old = new Date (latestDate.getTime() - (cleanup * 86400000));
+         var old = new Date (latestDate.getTime() - (cleanup * oneDay));
          db.remove ({timestamp: {$lt:old}}, {multi:true});
       }
    }

@@ -350,6 +350,8 @@ function showOneProgram (programs, i, elements) {
       parameterstable.appendChild
          (showOneProgramString (programs, i, 'Name', 'name', '', 16));
       parameterstable.appendChild
+         (showOneProgramString (programs, i, 'Season', 'season', '', 16));
+      parameterstable.appendChild
          (showOneProgramString (programs, i, 'Start time', 'start', 'hh:mm', 10));
       parameterstable.appendChild
          (showOneProgramString (programs, i, 'Start date', 'date', 'yyyymmdd', 10));
@@ -451,13 +453,57 @@ function addProgram () {
    forceVisible(elements);
 }
 
-function showOneAdjust (adjust, schedule, elements) {
+function showOneSeason (seasons, i, elements) {
    for (var k = 0; k < elements.length; k++) {
       var outer = document.createElement("tr");
       var column = document.createElement("td");
       var input = document.createElement("input");
       input.type = 'text';
-      input.value = schedule;
+      input.value = seasons[i].name;
+      input.placeholder = 'Name';
+      column.appendChild(input);
+      outer.appendChild(column);
+      for (var j = 0; j < 12; j++) {
+         column = document.createElement("td");
+         input = document.createElement("input");
+         input.type = 'checkbox';
+         input.name = 'season_'+i+'_'+j;
+         input.checked = (seasons[i].monthly[j] == true);
+         column.appendChild(input);
+         outer.appendChild(column);
+      }
+      elements[k].appendChild(outer);
+   }
+}
+
+function addSeason () {
+
+   var name = 'Unnamed';
+
+   if (! editing.seasons) {
+      editing.seasons = new Array();
+   }
+
+   var i = editing.seasons.length;
+   editing.seasons[i] = new Object();
+   editing.seasons[i].name = '';
+   editing.seasons[i].monthly = new Array();
+   for (var j = 0; j < 12; j++) {
+      editing.seasons[i].monthly[j] = false;
+   }
+
+   var elements = document.getElementsByName('seasontable');
+   showOneSeason (editing.seasons, i, elements);
+   forceVisible(elements);
+}
+
+function showOneAdjust (adjust, i, elements) {
+   for (var k = 0; k < elements.length; k++) {
+      var outer = document.createElement("tr");
+      var column = document.createElement("td");
+      var input = document.createElement("input");
+      input.type = 'text';
+      input.value = adjust[i].name;
       input.placeholder = 'Name';
       column.appendChild(input);
       outer.appendChild(column);
@@ -468,8 +514,8 @@ function showOneAdjust (adjust, schedule, elements) {
          input.type = 'text';
          input.inputmode = 'numeric';
          input.placeholder = '%';
-         input.name = schedule+'_'+j;
-         input.value = adjust[schedule].monthly[j];
+         input.name = 'adjust_'+i+'_'+j;
+         input.value = adjust[i].monthly[j];
          column.appendChild(input);
          outer.appendChild(column);
       }
@@ -481,16 +527,21 @@ function addMonthly () {
 
    var name = 'Unnamed';
 
+   if (! editing.adjust) {
+      editing.adjust = new Object();
+   }
    if (editing.adjust[name]) return;
 
-   editing.adjust[name] = new Object();
-   editing.adjust[name].monthly = new Array();
-   for (var i = 0; i < 12; i++) {
-      editing.adjust[name].monthly[i] = 100;
+   var i = editing.adjust.length;
+   editing.adjust[i] = new Object();
+   editing.adjust[i].name = '';
+   editing.adjust[i].monthly = new Array();
+   for (var j = 0; j < 12; j++) {
+      editing.adjust[i].monthly[j] = 100;
    }
 
    var elements = document.getElementsByName('monthlytable');
-   showOneAdjust (editing.adjust, name, elements);
+   showOneAdjust (editing.adjust, i, elements);
    forceVisible(elements);
 }
 
@@ -533,8 +584,16 @@ window.onload = function() {
    function showExistingAdjust (adjust) {
       if (! adjust) return;
       var elements = document.getElementsByName('monthlytable');
-      for (var schedule in adjust) {
-         showOneAdjust (adjust, schedule, elements);
+      for (var i = 0; i < adjust.length; i++) {
+         showOneAdjust (adjust, i, elements);
+      }
+   }
+
+   function showExistingSeasons (seasons) {
+      if (! seasons) return;
+      var elements = document.getElementsByName('seasontable');
+      for (var i = 0; i < seasons.length; i++) {
+         showOneSeason (seasons, i, elements);
       }
    }
 
@@ -559,11 +618,19 @@ window.onload = function() {
 
       showExistingZones (config.zones);
       showExistingPrograms (config.programs);
+      showExistingSeasons (config.seasons);
       showExistingAdjust (config.adjust);
       showExistingCalendars (config.calendars);
       showExistingRefreshSchedule (config.weather, 'weather');
       showExistingRefreshSchedule (config.wateringindex, 'waterindex');
 
+      if (! config.event) {
+         config.event = new Object();
+         if (config.syslog !== undefined) {
+            config.event.syslog = config.syslog;
+            delete config.syslog;
+         }
+      }
       showInput ("eventcleanup", config.event.cleanup);
       showCheckbox ("eventsyslog", config.event.syslog);
 
@@ -668,6 +735,31 @@ window.onload = function() {
         <th width="5%">Disabled</th>
         <th width="60%">Source</th>
      </tr>
+     </table>
+   </form>
+   </div>
+   <br>
+   <button class="addbutton" onclick="addSeason()">Add</button>
+   <button class="configbuttonwithadd" onclick="visible('configseason')">Seasons</button>
+   <br>
+   <div name="configseason" class="hidable" display="none">
+   <form name="sprkrconfig">
+     <table name="seasontable">
+        <tr>
+        <th>Season</th>
+        <th>January</th>
+        <th>February</th>
+        <th>March</th>
+        <th>April</th>
+        <th>May</th>
+        <th>June</th>
+        <th>July</th>
+        <th>August</th>
+        <th>September</th>
+        <th>October</th>
+        <th>November</th>
+        <th>December</th>
+        </tr>
      </table>
    </form>
    </div>

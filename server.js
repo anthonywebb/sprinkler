@@ -19,13 +19,13 @@ var running = {};
 var runqueue = [];
 var currOn = 0;
 var buttonTimer = null;
-var lastScheduleCheck = null;
+var lastScheduleCheck = -1;
 var lastWeatherUpdateRecorded = 0;
 var lastWateringIndexUpdateRecorded = 0;
 var zonecount = 0;
 var programcount = 0;
 
-var rainDelayInterval = 86340000; // 1 day - 1 minute.
+const rainDelayInterval = 86340000; // 1 day - 1 minute.
 var rainTimer = 0;
 
 
@@ -408,18 +408,43 @@ app.get('/hardware/info', function(req, res){
 
 // Go through one list of watering programs to search one to activate.
 //
-function schedulePrograms (programs, currTime, currDay, d) {
+function schedulePrograms (programs, now) {
     if (programs == null) return;
-    for(var i=0;i<programs.length;i++){
+    var today = now.day();
+    var timeofday = now.format('HH:mm');
+
+    for(var i = 0; i < programs.length; i++){
         // Eliminate immediately a program that would not start
         // at this exact time, or was disabled.
-        if (currTime != programs[i].start) continue;
+        if (timeofday != programs[i].start) continue;
         if (! programs[i].active) continue;
+
+        // Allow enabling a program for a specific season only (user-defined)
+        if (programs[i].season) {
+           if (config.seasons) {
+              var giveup = false;
+              for (var si = 0; si < config.seasons.length; si++) {
+                 if (config.seasons[si].name == programs[i].season) {
+                    if (config.seasons[si].weekly) {
+                       if (! config.seasons[si].weekly[now.week()]) {
+                          giveup = true;
+                       }
+                    } else if (config.seasons[si].monthly) {
+                       if (! config.seasons[si].monthly[now.month()]) {
+                          giveup = true;
+                       }
+                    }
+                    break;
+                 }
+              }
+              if (giveup) continue;
+           }
+        }
 
         // Check when the program starts (or started) to be active.
         if (programs[i].date) {
-           var date = moment(programs[i].date+' '+currTime, 'YYYYMMDD HH:mm');
-           var delta = d.diff(date, 'days');
+           var date = moment(programs[i].date+' '+timeofday, 'YYYYMMDD HH:mm');
+           var delta = now.diff(date, 'days');
            if (delta < 0) continue; // Starts at a future date.
         } else {
            delta = 0; // Force today.
@@ -430,7 +455,7 @@ function schedulePrograms (programs, currTime, currDay, d) {
         case 'weekly':
             // Runs weekly, on specific days of the week.
             debugLog ('Checking day for program '+programs[i].name+' (weekly)');
-            if(programs[i].days[currDay]){
+            if(programs[i].days[today]){
                 programOn(programs[i]);
             }
             break;
@@ -460,12 +485,11 @@ function scheduler () {
 
     if (config.on == false) return;
 
-    var d = moment().tz(config.timezone);
-    var currTime = d.format('HH:mm');
-    var currDay = parseInt(d.format('d'));
+    var now = moment().tz(config.timezone);
 
-    if (currTime == lastScheduleCheck) return;
-    lastScheduleCheck = currTime;
+    var thisminute = now.minute();
+    if (thisminute == lastScheduleCheck) return;
+    lastScheduleCheck = thisminute;
 
     // Rain sensor(s) handling.
     // In this design, rain detection does not abort an active program
@@ -476,19 +500,17 @@ function scheduler () {
     // behavior more predictable. This is just a (debatable) choice.
 
     if (config.raindelay) {
-        var now = new Date().getTime();
-
         if (hardware.rainSensor() || weather.rainsensor()) {
-              var nextTimer = now + rainDelayInterval;
+              var nextTimer = now.getTime() + rainDelayInterval;
               if (nextTimer > rainTimer) {
                   rainTimer = nextTimer;
               }
         }
-        if (rainTimer > now) return;
+        if (rainTimer > now.getTime()) return;
     }
 
-    schedulePrograms (config.programs, currTime, currDay, d);
-    schedulePrograms (calendar.programs(), currTime, currDay, d);
+    schedulePrograms (config.programs, now);
+    schedulePrograms (calendar.programs(), now);
 }
 
 ///////////////////////////////////////
@@ -628,21 +650,29 @@ function programOn(program) {
         var source = null;
         var adjusted = seconds;
 
-        var adjustindex = zoneconfig.adjust;
-        if (adjustindex == null) {
-           adjustindex = "default";
+        var adjustname = zoneconfig.adjust;
+        if (adjustname == null) {
+           adjustname = "default";
         }
         var adjust = null;
         if (config.adjust != null) {
-            adjust = config.adjust[adjustindex];
+            for (var ai = 0; ai < config.adjust.length; ai++) {
+               if (config.adjust[ai].name == adjustname) {
+                  adjust = config.adjust[ai];
+               }
+            }
         }
         if (adjust != null) {
             // Predefined adjustments take priority.
-            if (adjust.monthly != null) {
-                var ratio = adjust.monthly[moment().month()];
-                adjusted = Math.floor(((seconds * ratio) + 50) / 100);
-                source = adjustindex+' (monthly)'
+            var ratio = 100;
+            if (adjust.weekly != null) {
+                ratio = adjust.weekly[moment().week()];
+                source = adjustname+' (weekly)'
+            } else if (adjust.monthly != null) {
+                ratio = adjust.monthly[moment().month()];
+                source = adjustname+' (monthly)'
             }
+            adjusted = Math.floor(((seconds * ratio) + 50) / 100);
         } else {
             if (wateringindex.enabled()) {
                 // Adjust the zone duration according to the watering index.
