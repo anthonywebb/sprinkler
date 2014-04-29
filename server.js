@@ -501,12 +501,12 @@ function scheduler () {
 
     if (config.raindelay) {
         if (hardware.rainSensor() || weather.rainsensor()) {
-              var nextTimer = now.getTime() + rainDelayInterval;
+              var nextTimer = rainDelayInterval + now;
               if (nextTimer > rainTimer) {
                   rainTimer = nextTimer;
               }
         }
-        if (rainTimer > now.getTime()) return;
+        if (rainTimer > +now) return;
     }
 
     schedulePrograms (config.programs, now);
