@@ -77,6 +77,24 @@ function showOneZone (zones, i, elements) {
       adjustcolumn.appendChild(adjustinput);
       outer.appendChild(adjustcolumn);
 
+      var pulsecolumn = document.createElement("td");
+      var pulseinput = document.createElement("input");
+      pulseinput.type = 'text';
+      if (zones[i].pulse)
+         pulseinput.value = zones[i].pulse;
+      pulseinput.placeholder = 'Seconds';
+      pulsecolumn.appendChild(pulseinput);
+      outer.appendChild(pulsecolumn);
+
+      var pausecolumn = document.createElement("td");
+      var pauseinput = document.createElement("input");
+      pauseinput.type = 'text';
+      if (zones[i].pause)
+         pauseinput.value = zones[i].pause;
+      pauseinput.placeholder = 'Seconds';
+      pausecolumn.appendChild(pauseinput);
+      outer.appendChild(pausecolumn);
+
       var manualcolumn = document.createElement("td");
       var manualinput = document.createElement("input");
       manualinput.type = 'checkbox';
@@ -707,7 +725,7 @@ window.onload = function() {
    <div name="configzone" class="hidable" display="none">
    <form name="sprkrconfig">
      <table name="zonetable">
-     <tr><th>Index</th><th>Name</th><th>Monthly adjustment</th><th>Manual</th></tr>
+     <tr><th>Index</th><th>Name</th><th>Monthly adjustment</th><th>Pulse</th><th>Pause</th><th>Manual</th></tr>
      </table>
    </form>
    </div>
