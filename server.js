@@ -688,9 +688,30 @@ function programOn(program) {
             }
         }
         if (source != null) {
-           runqueue.push({zone:zone,seconds:adjusted,raw:seconds,adjust:source,parent:program.name});
+           var actualratio = Math.floor((adjusted * 100) / seconds);
+           var remainder = adjusted;
+           if (zoneconfig.pulse) {
+              while (remainder > zoneconfig.pulse) {
+                 runqueue.push({zone:zone,seconds:zoneconfig.pulse,adjust:source,ratio:actualratio,parent:program.name});
+                 if (zoneconfig.pause) {
+                    runqueue.push({zone:null,seconds:zoneconfig.pause,parent:program.name});
+                 }
+                 remainder -= zoneconfig.pulse;
+              }
+           }
+           runqueue.push({zone:zone,seconds:remainder,adjust:source,ratio:actualratio,parent:program.name});
         } else {
-           runqueue.push({zone:zone,seconds:seconds,parent:program.name});
+           var remainder = seconds;
+           if (zoneconfig.pulse) {
+              while (remainder > zoneconfig.pulse) {
+                 runqueue.push({zone:zone,seconds:zoneconfig.pulse,parent:program.name});
+                 if (zoneconfig.pause) {
+                    runqueue.push({zone:null,seconds:zoneconfig.pause,parent:program.name});
+                 }
+                 remainder -= zoneconfig.pulse;
+              }
+           }
+           runqueue.push({zone:zone,seconds:remainder,parent:program.name});
         }
     }
 
@@ -717,15 +738,17 @@ function programOn(program) {
 //
 function zonesOff() {
     debugLog('shutting off all zones');
-    
-    // if we are currently running something, log that we interrupted it.
-    if(running.seconds) {
-        if(running.remaining == 1) running.remaining = 0;
-        var runtime = running.seconds-running.remaining;
-        event.record({action: 'CANCEL', zone: running.zone-0, parent: running.parent, seconds: running.seconds, runtime: runtime});
-    }
 
-    running = {};
+    if (running != null) {
+        // if we are currently running something, log that we interrupted it.
+        if (running.remaining > 0) {
+           if(running.remaining == 1) running.remaining = 0;
+           var runtime = running.seconds-running.remaining;
+           event.record({action: 'CANCEL', zone: running.zone-0, parent: running.parent, seconds: running.seconds, runtime: runtime});
+        }
+
+        running = null;
+    }
 
     for(var i = 0; i < zonecount; i++){
         hardware.setZone (i, false);
@@ -742,7 +765,7 @@ function killQueue() {
 
 function processQueue() {
     // is anything in the queue?
-    if(runqueue.length){
+    if(runqueue.length) {
         // start working on the next item in the queue
         running = runqueue.shift();
 
@@ -752,13 +775,21 @@ function processQueue() {
             return;
         }
 
-        if ((running.zone == null) || (running.zone == undefined) || (running.zone < 0) || (running.zone >= zonecount)) {
+        if (running.zone == null) { // This is a pause.
+            setTimeout(function(){
+                running = {parent:running.parent}; // Wait time.
+                processQueue();
+            },running.seconds*1000);
+            return;
+        }
+
+        if ((running.zone == undefined) || (running.zone < 0) || (running.zone >= zonecount)) {
             // Don't process an invalid program.
             errorLog('Invalid zone '+running.zone);
             return;
         }
         if (running.adjust != null) {
-            event.record({action: 'START', zone:running.zone-0, parent: running.parent, seconds: running.seconds, adjust:running.adjust, raw:running.raw});
+            event.record({action: 'START', zone:running.zone-0, parent: running.parent, seconds: running.seconds, adjust:running.adjust, ratio:running.ratio});
         } else {
             event.record({action: 'START', zone:running.zone-0, parent: running.parent, seconds: running.seconds});
         }
@@ -784,8 +815,6 @@ function processQueue() {
             hardware.setZone (running.zone, false);
             hardware.apply();
 
-            event.record({action: 'END', zone: running.zone-0, parent: running.parent, seconds: running.seconds, runtime: running.seconds});
-
             if (running.parent) {
                if (runqueue.length) {
                   if (running.parent != runqueue[0].parent) {
@@ -795,7 +824,7 @@ function processQueue() {
                   event.record({action: 'END', program: running.parent});
                }
             }
-            running = {};
+            running = {parent:running.parent}; // Wait time.
 
             // wait a couple seconds and kick off the next
             setTimeout(function(){
@@ -808,6 +837,7 @@ function processQueue() {
         // once there is nothing left to process we can clear the timers
         zonesOff();
         clearTimers();
+        running = null; // Now idle for real.
     }
 }
 

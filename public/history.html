@@ -26,7 +26,10 @@ window.onload = function() {
 
    function showAdjustment (event) {
       if (event.adjust != null) {
-         if (event.raw) {
+         if (event.ratio) {
+            return 'ADJUSTED '+event.ratio+'% USING '+event.adjust;
+         } else if (event.raw) {
+            // OBSOLETE Support old event format.
             var ratio = Math.floor((event.seconds * 100) / event.raw);
             return 'ADJUSTED '+ratio+'% USING '+event.adjust;
          } else {

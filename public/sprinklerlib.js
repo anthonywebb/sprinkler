@@ -94,11 +94,14 @@ function sprinklerUpdate () {
 
          sprinklerSetContent ('hostname', response.hostname);
 
-         if ((response.running == null) || (response.running.zone == null)) {
+         if (response.running == null) {
             content = 'IDLE';
             content2 = 'IDLE';
          } else {
-            content = 'ZONE '+response.running.zone+' ACTIVE';
+            if (response.running.zone != null)
+               content = 'ZONE '+response.running.zone+' ACTIVE';
+            else
+               content = 'IDLE';
             if (response.running.parent != null)
                content2 = response.running.parent;
             else

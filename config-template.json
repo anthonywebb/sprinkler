@@ -4,7 +4,7 @@
         "port": 8080
     },
     "zones": [
-        {"name":"Zone 1", "adjust":"sand"},
+        {"name":"Zone 1", "adjust":"sand", "pulse":40, "pause":20},
         {"name":"Zone 2"},
         {"name":"Zone 3"},
         {"name":"Zone 4"},
