@@ -96,7 +96,8 @@ window.onload = function() {
                }
                break;
             case 'END':
-               action = 'END';
+            case 'CANCEL':
+               action = event.action;
                if (event.program != null) {
                   item = 'PROGRAM '+event.program;
                } else if (event.zone != null) {
@@ -104,12 +105,6 @@ window.onload = function() {
                   description = 'AFTER '+sprinklerShowDuration(event.runtime);
                   description += ', '+showParent(event);
                }
-               break;
-            case 'CANCEL':
-               action = 'CANCEL';
-               item = showZone(config.zones, event);
-               description = 'AFTER '+sprinklerShowDuration(event.runtime);
-               description += ', '+showParent(event);
                break;
             case 'SKIP':
                action = 'SKIP';

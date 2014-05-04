@@ -745,6 +745,8 @@ function zonesOff() {
            if(running.remaining == 1) running.remaining = 0;
            var runtime = running.seconds-running.remaining;
            event.record({action: 'CANCEL', zone: running.zone-0, parent: running.parent, seconds: running.seconds, runtime: runtime});
+        } else if (running.parent) {
+           event.record({action: 'CANCEL', program: running.parent});
         }
 
         running = null;
@@ -776,7 +778,7 @@ function processQueue() {
         }
 
         if (running.zone == null) { // This is a pause.
-            setTimeout(function(){
+            zoneTimer = setTimeout(function(){
                 running = {parent:running.parent}; // Wait time.
                 processQueue();
             },running.seconds*1000);
