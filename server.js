@@ -173,15 +173,14 @@ app.get('/status', function(req, res){
         on:config.on,
         hostname:os.hostname(),
         weather:{
-            enable:weather.enabled(),
+            enabled:weather.enabled(),
             status:weather.status(),
             updated:weather.updated(),
             adjustment:weather.adjustment(),
-            rainsensor:weather.rainsensor(),
             source:'WEATHER'
         },
         wateringindex:{
-            enable:wateringindex.enabled(),
+            enabled:wateringindex.enabled(),
             status:wateringindex.status(),
             updated:wateringindex.updated(),
             adjustment:wateringindex.adjustment(),
@@ -840,9 +839,9 @@ function processQueue() {
 
     } else {
         // once there is nothing left to process we can clear the timers
+        running = null; // Now idle for real.
         zonesOff();
         clearTimers();
-        running = null; // Now idle for real.
     }
 }
 

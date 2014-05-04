@@ -131,18 +131,15 @@ function sprinklerUpdate () {
          if ((response.wateringindex) && (response.wateringindex.enabled)) {
 
             sprinklerSetContent ('adjustment',
-                ''+response.wateringindex.adjustment+'%'+' (FROM '+response.wateringindex.source+')');
-            sprinklerSetContent ('rainsensor', 'NO SENSOR');
+                ''+response.wateringindex.adjustment+'%'+' FROM '+response.wateringindex.source);
 
          } else if ((response.weather) && (response.weather.enabled)) {
 
             sprinklerSetContent ('adjustment',
-                ''+response.weather.adjustment+'%'+' (FROM '+response.weather.source+')');
-            sprinklerSetContent ('rainsensor', response.weather.rainsensor?'SENSOR ON':'SENSOR OFF');
+                ''+response.weather.adjustment+'%'+' FROM '+response.weather.source);
 
          } else {
             sprinklerSetContent ('adjustment','NOT AVAILABLE');
-            sprinklerSetContent ('rainsensor','NO SENSOR');
          }
 
          if ((response.weather) && (response.weather.status)) {
@@ -158,10 +155,12 @@ function sprinklerUpdate () {
                sprinklerSetContent ('temperature', ''+response.temperature+' F');
                sprinklerSetContent ('humidity', ''+response.humidity+'%');
                sprinklerSetContent ('rain', ''+response.rain+' in');
+               sprinklerSetContent ('rainsensor', response.rainsensor?'SENSOR ON':'SENSOR OFF');
             }
             weathercmd.send(null);
          } else {
             sprinklerSetContent ('weatherupdated', 'NOT AVAILABLE');
+            sprinklerSetContent ('rainsensor', 'NO SENSOR');
          }
 
          for (var i = 0; i < response.calendars.length; i++) {
