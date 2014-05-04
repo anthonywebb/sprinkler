@@ -128,13 +128,25 @@ function sprinklerUpdate () {
          }
          sprinklerSetContent ('raindelay', content);
 
-         if ((response.wateringindex) && (response.wateringindex.status)) {
-            content = new Date(response.wateringindex.updated).toLocaleString();
-            sprinklerSetContent ('weatherupdated', content);
+         if ((response.wateringindex) && (response.wateringindex.enabled)) {
+
             sprinklerSetContent ('adjustment',
-                                 ''+response.wateringindex.adjustment+'%');
-            sprinklerSetContent ('rainsensor', 'NOT AVAILABLE');
-         } else if ((response.weather) && (response.weather.status)) {
+                ''+response.wateringindex.adjustment+'%'+' (FROM '+response.wateringindex.source+')');
+            sprinklerSetContent ('rainsensor', 'NO SENSOR');
+
+         } else if ((response.weather) && (response.weather.enabled)) {
+
+            sprinklerSetContent ('adjustment',
+                ''+response.weather.adjustment+'%'+' (FROM '+response.weather.source+')');
+            sprinklerSetContent ('rainsensor', response.weather.rainsensor?'SENSOR ON':'SENSOR OFF');
+
+         } else {
+            sprinklerSetContent ('adjustment','NOT AVAILABLE');
+            sprinklerSetContent ('rainsensor','NO SENSOR');
+         }
+
+         if ((response.weather) && (response.weather.status)) {
+
             content = new Date(response.weather.updated).toLocaleString();
             sprinklerSetContent ('weatherupdated', content);
 
@@ -146,8 +158,6 @@ function sprinklerUpdate () {
                sprinklerSetContent ('temperature', ''+response.temperature+' F');
                sprinklerSetContent ('humidity', ''+response.humidity+'%');
                sprinklerSetContent ('rain', ''+response.rain+' in');
-               sprinklerSetContent ('rainsensor', response.rainsensor?'sensor ON':'sensor OFF');
-               sprinklerSetContent ('adjustment', ''+response.adjustment+'%');
             }
             weathercmd.send(null);
          } else {

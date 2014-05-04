@@ -176,13 +176,16 @@ app.get('/status', function(req, res){
             enable:weather.enabled(),
             status:weather.status(),
             updated:weather.updated(),
-            adjustment:weather.adjustment()
+            adjustment:weather.adjustment(),
+            rainsensor:weather.rainsensor(),
+            source:'WEATHER'
         },
         wateringindex:{
             enable:wateringindex.enabled(),
             status:wateringindex.status(),
             updated:wateringindex.updated(),
-            adjustment:wateringindex.adjustment()
+            adjustment:wateringindex.adjustment(),
+            source:wateringindex.source()
         },
         calendars:calendar.status(),
         raindelay:config.raindelay,
