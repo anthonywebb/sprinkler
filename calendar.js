@@ -30,7 +30,7 @@
 //
 //      Query the calendar servers for updates. A refresh is executed
 //      only if the last one was performed more than a defined interval
-//      (12 hours) ago, or if the configuration was changed.
+//      (every hour), or if the configuration was changed.
 //
 //   calendar.status ();
 //
@@ -52,14 +52,22 @@
 //   calendars             The calendar module configuration array.
 //
 //   calendars[n].format   Format of calendar data received. This module
-//                         only support format "iCalendar" for now.
+//                         only support format "iCalendar" for now, which
+//                         is also the default.
 //
 //   calendars[n].name     Base name for this calendar. The name is combined
 //                         with the name of each event to generate a unique
 //                         watering program name.
 //
+//   calendars[n].season   The season when this calendar is active.
+//
 //   calendars[n].source   The address of the calendar server. This is
 //                         typically an URL.
+//
+//   calendars[n].disabled A boolean. The calendar entry is not used if true.
+//                         This is used to desactivate a calendar without
+//                         removing its (typically long) URL. The default
+//                         is false.
 
 var fs = require('graceful-fs');
 var moment = require('moment-timezone');
@@ -82,7 +90,7 @@ function verboseLog (text) {
 
 function UnsupportedCalendar (format) {
    this.format = format;
-   this.status = "error";
+   this.status = 'disabled';
 }
 
 var imported = new Object();
@@ -93,8 +101,7 @@ imported.updated = null;
 
 var pendingCalendar = null;
 
-var lastUpdate = 0
-var updateInterval = 12 * 3600000; // 12 hours in milliseconds.
+var lastUpdateHour = null;
 
 var webRequest = null;
 
@@ -122,7 +129,16 @@ exports.configure = function (config, options) {
 
    for (var i = 0; i < config.calendars.length; i++) {
 
-      switch (config.calendars[i].format) {
+      var format = config.calendars[i].format;
+      if (! format)
+         format = "iCalendar";
+
+      if (config.calendars[i].disabled) {
+         imported.calendar[i] = new UnsupportedCalendar(format);
+         continue;
+      }
+
+      switch (format) {
 
       case "iCalendar":
          imported.calendar[i] = new ICalendar();
@@ -134,12 +150,14 @@ exports.configure = function (config, options) {
          break;
 
       default:
-         errorLog ('format '+config.calendars[i].format+' is not supported (in '+config.calendars[i].name+')');
-         imported.calendar[i] =
-            new UnsupportedCalendar(config.calendars[i].format);
+         errorLog ('format '+format+' is not supported (in '+config.calendars[i].name+')');
+         imported.calendar[i] = new UnsupportedCalendar(format);
          break;
       }
       imported.calendar[i].name = config.calendars[i].name;
+      if (config.calendars[i].season) {
+         imported.calendar[i].season = config.calendars[i].season;
+      }
       imported.calendar[i].source = config.calendars[i].source;
    }
    imported.location = config.location;
@@ -148,7 +166,7 @@ exports.configure = function (config, options) {
    }
 
    // Force access to the calendar on configuration change.
-   lastUpdate = new Date().getTime();
+   lastUpdateHour = new Date().getHours();
    loadNextCalendar();
 }
 
@@ -329,14 +347,17 @@ function iCalendarToProgram (calendar_name, event) {
    var program = new Object();
    program.active = true;
    program.parent = calendar_name;
-   program.name = calendar_name + '/' + event.summary;
+   program.name = event.summary+'@'+calendar_name;
    program.start = start.format('HH:mm');
    program.date = start.format('YYYYMMDD');
+
+   program.repeat = 'none'; // Default.
 
    if (event.rrule) {
       // Set the time of day, interval and day filter.
       switch (event.rrule.freq) {
       case 'DAILY':
+         program.repeat = 'daily';
          program.interval = event.rrule.interval;
          if (! program.interval) {
             program.interval = 1;
@@ -345,11 +366,12 @@ function iCalendarToProgram (calendar_name, event) {
 
       case 'WEEKLY':
          var days = event.rrule.byday.split(',');
-         program.days = new Array();
+         program.repeat = 'weekly';
+         program.days = [false, false, false, false, false, false, false];
          for (var k = 0; k < days.length; k++) {
             thisDay = iCalendarDaysDictionary.indexOf(days[k])
             if (thisDay >= 0) {
-               program.days[program.days.length] = thisDay;
+               program.days[thisDay] = true;
             } else {
                errorLog (days[k]+' is not a valid iCalendar day of the week');
             }
@@ -411,6 +433,9 @@ ICalendar.prototype.import = function (text) {
 
       var program = iCalendarToProgram (pendingCalendar.name, events[i]);
       if (program != null) {
+         if (pendingCalendar.season) {
+            program.season = pendingCalendar.season;
+         }
          var is_new_program = true;
          for (var j = 0; j < imported.programs.length; j++) {
             if (imported.programs[j].name == program.name) {
@@ -520,6 +545,34 @@ function loadFileCalendar () {
 }
 
 // --------------------------------------------------------------------------
+// Start the process of updating all calendars.
+//
+// Don't do anything if there is any pending request.
+//
+function loadCalendars () {
+
+   if (pendingCalendar != null) {
+      errorLog ('too early, calendar '+pendingCalendar+' is pending');
+      return;
+   }
+
+   for (var i = 0; i < imported.calendar.length; i++) {
+
+      if (imported.calendar[i].status == 'pending') {
+         errorLog ('too early, calendar '+pendingCalendar+' found pending');
+         return;
+      }
+   }
+
+   for (var i = 0; i < imported.calendar.length; i++) {
+      if (imported.calendar[i].status != 'disabled') {
+         imported.calendar[i].status = 'idle';
+      }
+   }
+   loadNextCalendar();
+}
+
+// --------------------------------------------------------------------------
 // Initiate the GET request for the first 'idle' calendar.
 //
 // This is a recursive function that calls itself when processing is
@@ -545,7 +598,10 @@ function loadNextCalendar () {
 
    for (var i = 0; i < imported.calendar.length; i++) {
 
-      if (imported.calendar[i].status == 'pending') return; // Too early.
+      if (imported.calendar[i].status == 'pending') {
+         errorLog ('too early, calendar '+pendingCalendar+' found pending');
+         return;
+      }
       if (imported.calendar[i].status != 'idle') continue;
 
       infoLog ('importing calendar ' + imported.calendar[i].name);
@@ -574,7 +630,7 @@ function loadNextCalendar () {
       // The calendar source URL does not match any supported protocol.
 
       errorLog ('unsupported protocol for '+imported.calendar[i].name +" in '"+ imported.calendar[i].source + "'");
-      imported.calendar[i].status = 'error';
+      imported.calendar[i].status = 'disabled';
       imported.received = null;
    }
 
@@ -592,13 +648,13 @@ exports.refresh = function () {
 
    if (imported.calendar.length == 0) return;
 
-   var time = new Date().getTime();
+   var hour = new Date().getHours();
 
    // Throttle when to request for information, to limit traffic.
-   if (time < lastUpdate + updateInterval) return;
-   lastUpdate = time;
+   if (hour == lastUpdateHour) return;
+   lastUpdateHour = hour;
 
-   loadNextCalendar();
+   loadCalendars();
 }
 
 // --------------------------------------------------------------------------

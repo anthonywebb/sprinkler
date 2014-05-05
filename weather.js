@@ -47,6 +47,11 @@
 //
 //      Return the time of the latest successful weather data update.
 //
+//   weather.enabled ();
+//
+//      Return true if the weather adjustment feature is both enabled
+//      and data is available.
+//
 //   weather.temperature ();
 //
 //      return the average temperature for the previous day.
@@ -68,6 +73,11 @@
 //
 //      return the weather-adjusted watering duration.
 //
+//   weather.adjustment ();
+//
+//      return the raw weather adjustment ratio (not subject to mix/max
+//      limits).
+//
 // CONFIGURATION
 //
 //   zipcode             The local USPS zipcode.
@@ -75,14 +85,24 @@
 //   weather             The weather module configuration object.
 //                       If missing, the weather module is disabled.
 //
+//   weather.refresh     When to refresh weather information. This is
+//                       an array of times of day (hour[:min]). One cannot
+//                       schedule two refresh within the same hour. The
+//                       minute part is used to control when, within each
+//                       hour, the refresh occurs, This is typically used
+//                       to control if the refresh occurs at the beginning
+//                       or at the end of the hour period.
+//
 //   weather.key         The Weather Underground access key.
 //                       If missing, the weather module is disabled.
 //
-//   weather.adjust.min  The minimum value for the weather adjustment.
-//                       (Default value: 30.)
-//
-//   weather.adjust.max  The maximum value for the weather adjustment.
-//                       (Default value: 150.)
+//   weather.adjust      Parameters for the weather adjustment formula.
+//                       This is a data structure with the following fields:
+//                          min:         minimal adjustment (default: 30)
+//                          max:         maximal adjustment (default: 150)
+//                          temperature: base temperature (default: 70)
+//                          humidity:    base humidity (default: 30)
+//                          sensitivity  (percentage, default: 100)
 //
 //   weather.raintrigger The rain level in inches that triggers the
 //                       simulated rain sensor. The rain sensor feature
@@ -96,12 +116,14 @@ var weatherConditions = null;
 
 var lastUpdate = 0
 var updateInterval = 6 * 3600000; // 6 hours in milliseconds.
+var refreshSchedule = new Array();;
 
 var url = null;
-var minadjust = 30;
-var maxadjust = 150;
+var enable = false;
 var raintrigger = null;
 var webRequest = null;
+
+var adjustParameters = new Object();
 
 var debugLog = function (text) {}
 
@@ -112,10 +134,16 @@ function verboseLog (text) {
 function restoreDefaults () {
 
    url = null;
-   weatherConditions = null;
-   minadjust = 30;
-   maxadjust = 150;
+   enable = false;
    raintrigger = null;
+   refreshSchedule = new Array();;
+
+   adjustParameters.enable = true;
+   adjustParameters.min = 30;
+   adjustParameters.max = 150;
+   adjustParameters.humidity = 30;
+   adjustParameters.temperature = 70;
+   adjustParameters.sensitivity = 100;
 }
 restoreDefaults();
 
@@ -129,31 +157,109 @@ exports.configure = function (config, options) {
    if (! config.weather) return;
    if (! config.weather.key) return;
 
+   enable = config.weather.enable;
+   if (!enable) {
+      weatherConditions = null;
+      return;
+   }
+
    url = 'http://api.wunderground.com/api/'
                 + config.weather.key + '/yesterday/conditions/q/'
                 + config.zipcode + '.json';
 
-   if (config.weather.adjust) {
-      if (config.weather.adjust.min) {
-         minadjust = config.weather.adjust.min;
+   if (config.weather.refresh) {
+      for (var i = 0; i < config.weather.refresh.length; i++) {
+         var option = config.weather.refresh[i].split(':');
+         if ((option.length > 0) && (option.length <= 2)) {
+            var j = refreshSchedule.length;
+            refreshSchedule[j] = new Object();
+            refreshSchedule[j].hour = option[0] - 0;
+            if (option.length > 1) {
+               refreshSchedule[j].minute = option[1] - 0;
+            } else {
+               refreshSchedule[j].minute = 0;
+            }
+            refreshSchedule[j].armed = true;
+         }
       }
-      if (config.weather.adjust.max) {
-         maxadjust = config.weather.adjust.max;
+   }
+
+   if (config.weather.adjust) {
+      if (config.weather.adjust.enable !== undefined) {
+         adjustParameters.enable = config.weather.adjust.enable;
+      }
+      if (config.weather.adjust.min !== undefined) {
+         adjustParameters.min = config.weather.adjust.min - 0;
+      }
+      if (config.weather.adjust.max !== undefined) {
+         adjustParameters.max = config.weather.adjust.max - 0;
+      }
+      if (config.weather.adjust.temperature !== undefined) {
+         adjustParameters.temperature = config.weather.adjust.temperature - 0;
+      }
+      if (config.weather.adjust.humidity !== undefined) {
+         adjustParameters.humidity = config.weather.adjust.humidity - 0;
+      }
+      if (config.weather.adjust.sensitivity !== undefined) {
+         adjustParameters.sensitivity = config.weather.adjust.sensitivity - 0;
       }
    }
 
    raintrigger = config.weather.raintrigger;
 
-   getWeather();
+   if (weatherConditions) {
+      // Force a refresh soon, but not immediately (to avoid consuming
+      // the quota too fast if the user makes small changes to the config).
+      // (Do it in 10 minutes.)
+      lastUpdate = new Date().getTime() - updateInterval + 600000;
+   } else {
+      // That is the first time we ask. Do it now.
+      getWeatherNow();
+   }
+}
+
+function toBeRefreshed (now) {
+
+   var hour = now.getHours();
+   var minute = now.getMinutes();
+
+   var result = false;
+
+   for (var i = 0; i < refreshSchedule.length; i++) {
+
+      if (refreshSchedule[i].hour == hour) {
+         if (refreshSchedule[i].armed) {
+            if (minute >= refreshSchedule[i].minute) {
+               refreshSchedule[i].armed = false;
+               result = true; // ---- One scheduled time has come.
+            }
+         }
+      } else {
+         refreshSchedule[i].armed = true;
+      }
+   }
+   return result;
 }
 
 function getWeather () {
 
-   var time = new Date().getTime();
+   var now = new Date();
+   var time = now.getTime();
 
    // Throttle when to request for information, to avoid being blocked.
-   if (time < lastUpdate + updateInterval) return;
-   lastUpdate = time;
+   // Two options: user-scheduled refresh times, or else periodic.
+   if (refreshSchedule.length > 0) {
+      if (toBeRefreshed(now)) {
+         getWeatherNow();
+      }
+   } else if (time > lastUpdate + updateInterval) {
+      getWeatherNow();
+   }
+}
+
+function getWeatherNow () {
+
+   lastUpdate = new Date().getTime();
 
    debugLog ('checking for update..');
    received = "";
@@ -198,14 +304,22 @@ exports.updated = function () {
    return {};
 }
 
-exports.temperature = function () {
+exports.enabled = function () {
+   if (weatherConditions) {
+      return adjustParameters.enable;
+   }
+   return false;
+}
+
+function temperature () {
    if (weatherConditions) {
       return weatherConditions.history.dailysummary[0].meantempi - 0;
    }
    return null;
 }
+exports.temperature = temperature;
 
-exports.humidity = function () {
+function humidity () {
    if (weatherConditions) {
       max = weatherConditions.history.dailysummary[0].maxhumidity - 0;
       min = weatherConditions.history.dailysummary[0].minhumidity - 0;
@@ -213,8 +327,9 @@ exports.humidity = function () {
    }
    return null;
 }
+exports.humidity = humidity;
 
-exports.rain = function () {
+function rain () {
    if (weatherConditions) {
       var precipi = weatherConditions.history.dailysummary[0].precipi - 0;
       var today = weatherConditions.current_observation.precip_today_in - 0;
@@ -222,6 +337,7 @@ exports.rain = function () {
    }
    return null;
 }
+exports.rain = rain;
 
 exports.rainsensor = function () {
    if (raintrigger == null) return false;
@@ -235,30 +351,24 @@ function adjustment () {
 
    if (weatherConditions == null) return 100;
 
-   var current = weatherConditions.current_observation;
-   var history = weatherConditions.history.dailysummary[0];
+   var humid_factor = adjustParameters.humidity - humidity();
+   var temp_factor = (temperature() - adjustParameters.temperature) * 4;
+   var rain_factor = 0.0 - (rain() * 200.0);
 
-   // We do the following to convert everything to numeric.
-   // Otherwise the data is string by default and the + operator
-   // behaves in non-mathematical ways.
-   var maxhumidity = history.maxhumidity - 0;
-   var minhumidity = history.minhumidity - 0;
-   var meantempi = history.meantempi - 0;
-   var precipi = history.precipi - 0;
-   var precip_today_in = current.precip_today_in - 0;
+   var adjust = humid_factor + temp_factor + rain_factor;
+   adjust = (adjustParameters.sensitivity * adjust) / 100;
 
-   var humid_factor = 30 - ((maxhumidity + minhumidity) / 2);
-   var temp_factor = (meantempi - 70) * 4;
-   var rain_factor = 0.0 - ((precipi + precip_today_in) * 200.0);
-
-   return 100+humid_factor+temp_factor+rain_factor;
+   return Math.floor(Math.max(0,100+adjust));
 }
 
 exports.adjust = function (duration) {
    if (weatherConditions == null) return duration;
-   var minadjusted = (duration * minadjust) / 100;
-   var maxadjusted = (duration * maxadjust) / 100;
+   if (! adjustParameters.enable) return duration;
+   var minadjusted = ((duration * adjustParameters.min) + 50) / 100;
+   var maxadjusted = ((duration * adjustParameters.max) + 50) / 100;
    var adjusted    = ((duration * adjustment()) + 50) / 100;
    return Math.floor(Math.min(Math.max(minadjusted, adjusted), maxadjusted));
 }
+
+exports.adjustment = adjustment;
 

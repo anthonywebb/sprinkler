@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel=stylesheet type="text/css"
+      href="/sprinkler.css" title="Sprinkler">
+<script src="/sprinklerlib.js"></script>
+<script>
+
+var editing = null;
+
+var gui = new Object();
+
+function showInput (name, content) {
+   var elements = document.getElementsByName (name);
+   for (var i = 0; i < elements.length; i++) {
+      if (content || (content === 0)) elements[i].value = ''+content;
+   }
+}
+
+function showCheckbox (name, content) {
+   var elements = document.getElementsByName (name);
+   for (var i = 0; i < elements.length; i++) {
+      elements[i].checked = (content == true);
+   }
+}
+
+function hideAll () {
+   var elements = document.getElementsByClassName('hidable');
+   for (var i = 0; i < elements.length; i++) {
+      elements[i].style.display = 'none';
+   }
+}
+
+function visible (name) {
+   elements = document.getElementsByName(name);
+   for (var i = 0; i < elements.length; i++) {
+      if (elements[i].style.display === 'none') {
+         elements[i].style.display = 'block';
+      } else {
+         elements[i].style.display = 'none';
+      }
+   }
+}
+
+function forceVisible (elements) {
+   for (var k = 0; k < elements.length; k++) {
+      elements[k].style.display = 'block';
+   }
+}
+
+function showOneZone (zones, i, elements) {
+
+   for (var k = 0; k < elements.length; k++) {
+      var outer = document.createElement("tr");
+
+      var labelcolumn = document.createElement("td");
+      var label = document.createElement("span");
+      label.innerHTML = ''+i;
+      labelcolumn.appendChild(label);
+      outer.appendChild(labelcolumn);
+
+      var namecolumn = document.createElement("td");
+      var nameinput = document.createElement("input");
+      nameinput.type = 'text';
+      nameinput.name = 'zone_'+i;
+      nameinput.value = zones[i].name;
+      nameinput.placeholder = 'Zone name';
+      namecolumn.appendChild(nameinput);
+      outer.appendChild(namecolumn);
+
+      var adjustcolumn = document.createElement("td");
+      var adjustinput = document.createElement("input");
+      adjustinput.type = 'text';
+      if (zones[i].adjust)
+         adjustinput.value = zones[i].adjust;
+      adjustinput.placeholder = 'Schedule name';
+      adjustcolumn.appendChild(adjustinput);
+      outer.appendChild(adjustcolumn);
+
+      var pulsecolumn = document.createElement("td");
+      var pulseinput = document.createElement("input");
+      pulseinput.type = 'text';
+      if (zones[i].pulse)
+         pulseinput.value = zones[i].pulse;
+      pulseinput.placeholder = 'Seconds';
+      pulsecolumn.appendChild(pulseinput);
+      outer.appendChild(pulsecolumn);
+
+      var pausecolumn = document.createElement("td");
+      var pauseinput = document.createElement("input");
+      pauseinput.type = 'text';
+      if (zones[i].pause)
+         pauseinput.value = zones[i].pause;
+      pauseinput.placeholder = 'Seconds';
+      pausecolumn.appendChild(pauseinput);
+      outer.appendChild(pausecolumn);
+
+      var manualcolumn = document.createElement("td");
+      var manualinput = document.createElement("input");
+      manualinput.type = 'checkbox';
+      manualinput.checked = (zones[i].manual == true);
+      manualcolumn.appendChild(manualinput);
+      outer.appendChild(manualcolumn);
+
+      elements[k].appendChild(outer);
+   }
+}
+
+function addZone () {
+
+   if (! editing.zones) {
+      editing.zones = new Array();
+   }
+   var i = editing.zones.length;
+   editing.zones[i] = new Object();
+   editing.zones[i].name = 'zone '+i;
+   // No adjust (optional)
+   // No manual (optional)
+
+   var elements = document.getElementsByName('zonetable');
+   showOneZone (editing.zones, i, elements);
+   forceVisible(elements);
+}
+
+function showOneRefreshSchedule (weather, i, elements, name) {
+
+   for (var k = 0; k < elements.length; k++) {
+      var outer = document.createElement("tr");
+
+      var timecolumn = document.createElement("td");
+      var timeinput = document.createElement("input");
+      timeinput.type = 'text';
+      timeinput.size = 6;
+      timeinput.name = name+'refresh_'+i;
+      timeinput.value = weather.refresh[i];
+      timeinput.placeholder = 'hh:mm';
+      timecolumn.appendChild(timeinput);
+      outer.appendChild(timecolumn);
+
+      elements[k].appendChild(outer);
+   }
+}
+
+function addRefreshSchedule (data, name) {
+
+   if (! data.refresh) {
+      data.refresh = new Array();
+   }
+   var i = data.refresh.length;
+   data.refresh[i] = '';
+
+   var elements = document.getElementsByName(name+'refreshtable');
+   showOneRefreshSchedule (data, i, elements);
+   forceVisible(elements);
+}
+
+function addWeatherRefresh () {
+
+   if (! editing.weather) {
+      editing.weather = new Object();
+   }
+   addRefreshSchedule (editing.weather, 'weather');
+}
+
+function addWaterIndexRefresh () {
+
+   if (! editing.wateringindex) {
+      editing.wateringindex = new Object();
+   }
+   addRefreshSchedule (editing.wateringindex, 'waterindex');
+}
+
+function showOneCalendar (calendars, i, elements) {
+
+   for (var k = 0; k < elements.length; k++) {
+
+      var outer = document.createElement("tr");
+
+      var labelcolumn = document.createElement("td");
+      var label = document.createElement("span");
+      label.innerHTML = ''+i;
+      labelcolumn.appendChild(label);
+      outer.appendChild(labelcolumn);
+
+      var namecolumn = document.createElement("td");
+      var nameinput = document.createElement("input");
+      nameinput.type = 'text';
+      nameinput.name = 'calendar_'+i;
+      nameinput.value = calendars[i].name;
+      nameinput.placeholder = 'Name';
+      namecolumn.appendChild(nameinput);
+      outer.appendChild(namecolumn);
+
+      // For now only iCalendar is supported by the software,
+      // so editing the format is not allowed.
+      var formatcolumn = document.createElement("td");
+      var formatlabel = document.createElement("span");
+      formatlabel.innerHTML = calendars[i].format;
+      formatcolumn.appendChild(formatlabel);
+      outer.appendChild(formatcolumn);
+
+      var disabledcolumn = document.createElement("td");
+      var disabledinput = document.createElement("input");
+      disabledinput.type = 'checkbox';
+      disabledinput.checked = (calendars[i].disabled == true);
+      disabledcolumn.appendChild(disabledinput);
+      outer.appendChild(disabledcolumn);
+
+      var sourcecolumn = document.createElement("td");
+      var sourceinput = document.createElement("input");
+      sourceinput.type = 'text';
+      sourceinput.style.width = '100%';
+      sourceinput.value = calendars[i].source;
+      sourceinput.placeholder = "URL";
+      sourcecolumn.appendChild(sourceinput);
+      outer.appendChild(sourcecolumn);
+
+      elements[k].appendChild(outer);
+   }
+}
+
+function addCalendar () {
+
+   if (! editing.calendars) {
+      editing.calendars = new Array();
+   }
+   var i = editing.calendars.length;
+   editing.calendars[i] = new Object();
+   editing.calendars[i].name = 'Calendar '+i;
+   editing.calendars[i].format = 'iCalendar';
+   editing.calendars[i].source = '';
+
+   var elements = document.getElementsByName('calendartable');
+   showOneCalendar (editing.calendars, i, elements);
+   forceVisible(elements);
+}
+
+var toWeekDays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Satursday'];
+
+function showOneProgramString (programs, i, label, name, format, size) {
+
+   var program = programs[i];
+
+   var line = document.createElement("tr");
+
+   var labelcolumn = document.createElement("td");
+   var labelitem = document.createElement("span");
+   labelitem.innerHTML = label+':';
+   labelcolumn.appendChild(labelitem);
+   line.appendChild(labelcolumn);
+
+   var valuecolumn = document.createElement("td");
+   var valueentry = document.createElement("input");
+   valueentry.type = 'text';
+   valueentry.size = size;
+   if (program[name] != null) {
+      valueentry.value = program[name];
+   }
+   valueentry.placeholder = format;
+   valuecolumn.appendChild(valueentry);
+   line.appendChild(valuecolumn);
+
+   return line;
+}
+
+function showOneProgramFlag (programs, i, label, value) {
+
+   var program = programs[i];
+
+   var parameterline = document.createElement("tr");
+
+   var column = document.createElement("td");
+   parameterline.appendChild(column);
+
+   column = document.createElement("td");
+   var checkbox = document.createElement("input");
+   checkbox.type = 'checkbox';
+   checkbox.value = value;
+   checkbox.checked = value;
+   column.appendChild(checkbox);
+   var labelitem = document.createElement("span");
+   labelitem.innerHTML = label;
+   column.appendChild(labelitem);
+   parameterline.appendChild(column);
+
+   return parameterline;
+}
+
+function showOneProgramRadio (programs, i, label, name, value) {
+
+   var program = programs[i];
+
+   var parameterline = document.createElement("tr");
+
+   var column = document.createElement("td");
+   parameterline.appendChild(column);
+
+   column = document.createElement("td");
+
+   var checkbox = document.createElement("input");
+   checkbox.type = 'radio';
+   checkbox.name = 'editing.programs['+i+'].'+name;
+   checkbox.onchange = function () {
+      if (this.checked) {
+         editing.programs[i].repeat = this.value;
+      }
+      switch (editing.programs[i].repeat) {
+      case 'daily':
+         gui.programs[i].weekly.style.display = 'none';
+         gui.programs[i].daily.style.display = 'block';
+         break;
+      case 'weekly':
+         gui.programs[i].weekly.style.display = 'block';
+         gui.programs[i].daily.style.display = 'none';
+         break;
+      default:
+         gui.programs[i].weekly.style.display = 'none';
+         gui.programs[i].daily.style.display = 'none';
+      }
+   }
+   checkbox.checked = (program[name] == value);
+   checkbox.value = value;
+   column.appendChild(checkbox);
+
+   var labelitem = document.createElement("span");
+   labelitem.innerHTML = label;
+   column.appendChild(labelitem);
+
+   parameterline.appendChild(column);
+
+   return parameterline;
+}
+
+function showOneProgram (programs, i, elements) {
+
+   var program = programs[i];
+
+   // Make sure that the days array has the correct size.
+   if (program.days) {
+     for (var j = program.days.length; j < 7; j++) {
+        program.days[j] = false;
+     }
+   }
+   for (var k = 0; k < elements.length; k++) {
+      var programshell = document.createElement("tr");
+      var programshell2 = document.createElement("td");
+      var programtable = document.createElement("table");
+      programtable.className = 'programdata';
+
+      var programline = document.createElement("tr");
+      var header = document.createElement("th");
+      header.innerHTML = 'Parameters';
+      programline.appendChild(header);
+      header = document.createElement("th");
+      header.innerHTML = 'Zones duration';
+      programline.appendChild(header);
+      programtable.appendChild(programline);
+
+      programline = document.createElement("tr");
+
+      var parameterscolumn = document.createElement("td");
+      parameterscolumn.style.verticalAlign = 'top';
+      var parameterstable = document.createElement("table");
+      parameterstable.width = '100%';
+
+      parameterstable.appendChild
+         (showOneProgramFlag (programs, i, 'Active', program.active));
+      parameterstable.appendChild
+         (showOneProgramString (programs, i, 'Name', 'name', '', 16));
+      parameterstable.appendChild
+         (showOneProgramString (programs, i, 'Season', 'season', '', 16));
+      parameterstable.appendChild
+         (showOneProgramString (programs, i, 'Start time', 'start', 'hh:mm', 10));
+      parameterstable.appendChild
+         (showOneProgramString (programs, i, 'Start date', 'date', 'yyyymmdd', 10));
+
+      parameterstable.appendChild
+         (showOneProgramRadio (programs, i, 'Daily', 'repeat', 'daily'));
+      parameterstable.appendChild
+         (showOneProgramRadio (programs, i, 'Weekly', 'repeat', 'weekly'));
+
+      parameterscolumn.appendChild(parameterstable);
+      parameterscolumn.appendChild(document.createElement("br"));
+
+      if (! gui.programs) {
+         gui.programs = new Array();
+      }
+      gui.programs[i] = new Object();
+
+      var weekly = document.createElement("table");
+      weekly.name = 'program_'+i+'_weekly';
+      weekly.style.display = 'none';
+      gui.programs[i].weekly = weekly;
+      weekly.width = '100%';
+      for (var d = 0; d < 7; d++) {
+         weekly.appendChild (showOneProgramFlag (programs, i, toWeekDays[d], program.days[d]));
+      }
+      parameterscolumn.appendChild(weekly);
+
+      var daily = document.createElement('table');
+      daily.name = 'program_'+i+'_daily';
+      daily.style.display = 'none';
+      daily.width = '100%';
+      gui.programs[i].daily = daily;
+      var dailylabel = document.createElement('span');
+      dailylabel.innerHTML = 'Interval: ';
+      daily.appendChild(dailylabel);
+      var dailyvalue = document.createElement('input');
+      dailyvalue.type = 'text';
+      dailyvalue.size = 6;
+      if (program.interval) {
+         dailyvalue.value = program.interval;
+      }
+      dailyvalue.placeholder = 'Number';
+      daily.appendChild(dailyvalue);
+      parameterscolumn.appendChild(daily);
+
+      switch (program.repeat) {
+      case 'daily':
+         daily.style.display = 'block';
+         break;
+      case 'weekly':
+         weekly.style.display = 'block';
+         break;
+      }
+
+      programline.appendChild(parameterscolumn);
+
+      var zonecolumn = document.createElement("td");
+      zonecolumn.style.verticalAlign = 'top';
+      var zonetable = document.createElement("table");
+
+      for (var d = 0; d < program.zones.length; d++) {
+         var zoneline = document.createElement('tr');
+         zonetable.appendChild
+            (showOneProgramString (program.zones, d, 'Zone '+program.zones[d].zone, 'seconds', 'Seconds', 6));
+      }
+
+      zonecolumn.appendChild(zonetable);
+      programline.appendChild(zonecolumn);
+
+      programtable.appendChild(programline);
+      programshell2.appendChild(programtable);
+      programshell.appendChild(programshell2);
+
+      elements[k].appendChild(programshell);
+   }
+}
+
+function addProgram () {
+   if (! editing.programs) {
+      editing.programs = new Array();
+   }
+   var i = editing.programs.length;
+   editing.programs[i] = new Object();
+   editing.programs[i].active = true;
+   editing.programs[i].repeat = 'weekly';
+   editing.programs[i].name = '#'+i;
+   editing.programs[i].start = '';
+   editing.programs[i].days = new Array(true, true, true, true, true, true, true);
+   editing.programs[i].interval = 1;
+   editing.programs[i].zones = new Array();
+   for (var z = 0; z < editing.zones.length; z++) {
+      editing.programs[i].zones[z] = new Object();
+      editing.programs[i].zones[z].zone = z;
+      editing.programs[i].zones[z].seconds = '';
+   }
+
+   var elements = document.getElementsByName('programtable');
+   showOneProgram (editing.programs, i, elements);
+   forceVisible(elements);
+}
+
+function showOneSeason (seasons, i, elements) {
+   for (var k = 0; k < elements.length; k++) {
+      var outer = document.createElement("tr");
+      var column = document.createElement("td");
+      var input = document.createElement("input");
+      input.type = 'text';
+      input.value = seasons[i].name;
+      input.placeholder = 'Name';
+      column.appendChild(input);
+      outer.appendChild(column);
+      for (var j = 0; j < 12; j++) {
+         column = document.createElement("td");
+         input = document.createElement("input");
+         input.type = 'checkbox';
+         input.name = 'season_'+i+'_'+j;
+         input.checked = (seasons[i].monthly[j] == true);
+         column.appendChild(input);
+         outer.appendChild(column);
+      }
+      elements[k].appendChild(outer);
+   }
+}
+
+function addSeason () {
+
+   var name = 'Unnamed';
+
+   if (! editing.seasons) {
+      editing.seasons = new Array();
+   }
+
+   var i = editing.seasons.length;
+   editing.seasons[i] = new Object();
+   editing.seasons[i].name = '';
+   editing.seasons[i].monthly = new Array();
+   for (var j = 0; j < 12; j++) {
+      editing.seasons[i].monthly[j] = false;
+   }
+
+   var elements = document.getElementsByName('seasontable');
+   showOneSeason (editing.seasons, i, elements);
+   forceVisible(elements);
+}
+
+function showOneAdjust (adjust, i, elements) {
+   for (var k = 0; k < elements.length; k++) {
+      var outer = document.createElement("tr");
+      var column = document.createElement("td");
+      var input = document.createElement("input");
+      input.type = 'text';
+      input.value = adjust[i].name;
+      input.placeholder = 'Name';
+      column.appendChild(input);
+      outer.appendChild(column);
+      for (var j = 0; j < 12; j++) {
+         column = document.createElement("td");
+         input = document.createElement("input");
+         input.size = 3;
+         input.type = 'text';
+         input.inputmode = 'numeric';
+         input.placeholder = '%';
+         input.name = 'adjust_'+i+'_'+j;
+         input.value = adjust[i].monthly[j];
+         column.appendChild(input);
+         outer.appendChild(column);
+      }
+      elements[k].appendChild(outer);
+   }
+}
+
+function addMonthly () {
+
+   var name = 'Unnamed';
+
+   if (! editing.adjust) {
+      editing.adjust = new Object();
+   }
+   if (editing.adjust[name]) return;
+
+   var i = editing.adjust.length;
+   editing.adjust[i] = new Object();
+   editing.adjust[i].name = '';
+   editing.adjust[i].monthly = new Array();
+   for (var j = 0; j < 12; j++) {
+      editing.adjust[i].monthly[j] = 100;
+   }
+
+   var elements = document.getElementsByName('monthlytable');
+   showOneAdjust (editing.adjust, i, elements);
+   forceVisible(elements);
+}
+
+window.onload = function() {
+
+   function showExistingZones (zones) {
+      if (! zones) return;
+      var elements = document.getElementsByName('zonetable');
+      for (var i = 0; i < zones.length; i++) {
+         showOneZone (zones, i, elements);
+      }
+   }
+
+   function showExistingCalendars (calendars) {
+      if (! calendars) return;
+      var elements = document.getElementsByName('calendartable');
+      for (var i = 0; i < calendars.length; i++) {
+         showOneCalendar (calendars, i, elements);
+      }
+   }
+
+   function showExistingPrograms (programs) {
+      if (! programs) return;
+      var elements = document.getElementsByName('programtable');
+      for (var i = 0; i < programs.length; i++) {
+         var zones = programs[i].zones;
+         programs[i].zones = new Array();
+         for (var z = 0; z < editing.zones.length; z++) {
+            programs[i].zones[z] = new Object();
+            programs[i].zones[z].zone = z;
+            programs[i].zones[z].seconds = '';
+         }
+         for (var z = 0; z < zones.length; z++) {
+            programs[i].zones[zones[z].zone].seconds = zones[z].seconds;
+         }
+         showOneProgram (programs, i, elements);
+      }
+   }
+
+   function showExistingAdjust (adjust) {
+      if (! adjust) return;
+      var elements = document.getElementsByName('monthlytable');
+      for (var i = 0; i < adjust.length; i++) {
+         showOneAdjust (adjust, i, elements);
+      }
+   }
+
+   function showExistingSeasons (seasons) {
+      if (! seasons) return;
+      var elements = document.getElementsByName('seasontable');
+      for (var i = 0; i < seasons.length; i++) {
+         showOneSeason (seasons, i, elements);
+      }
+   }
+
+   function showExistingRefreshSchedule (data, name) {
+      if (! data) return;
+      if (data.refresh) {
+         var elements = document.getElementsByName(name+'refreshtable');
+         for (var i = 0; i < data.refresh.length; i++) {
+            showOneRefreshSchedule (data, i, elements, name);
+         }
+      }
+   }
+
+   sprinklerConfig (function (config) {
+      editing = config;
+      showInput ("webport", config.webserver.port);
+      showInput ("udpport", config.udp.port);
+      showInput ("location", config.location);
+      showInput ("zipcode", config.zipcode);
+      showInput ("timezone", config.timezone);
+      showCheckbox ("production", config.production);
+
+      showExistingZones (config.zones);
+      showExistingPrograms (config.programs);
+      showExistingSeasons (config.seasons);
+      showExistingAdjust (config.adjust);
+      showExistingCalendars (config.calendars);
+      showExistingRefreshSchedule (config.weather, 'weather');
+      showExistingRefreshSchedule (config.wateringindex, 'waterindex');
+
+      if (! config.event) {
+         config.event = new Object();
+         if (config.syslog !== undefined) {
+            config.event.syslog = config.syslog;
+            delete config.syslog;
+         }
+      }
+      showInput ("eventcleanup", config.event.cleanup);
+      showCheckbox ("eventsyslog", config.event.syslog);
+
+      if (config.weather) {
+         showCheckbox ("weatherenable", config.weather.enable);
+         if (config.weather.adjust) {
+            showCheckbox ("weatheradjustenable", config.weather.adjust.enable);
+            showInput ("weathermin", config.weather.adjust.min);
+            showInput ("weathermax", config.weather.adjust.max);
+            showInput ("weathertemp", config.weather.adjust.temperature);
+            showInput ("weatherhumid", config.weather.adjust.humidity);
+            showInput ("weathersens", config.weather.adjust.sensitivity);
+         }
+         showInput ("weatherkey", config.weather.key);
+         showInput ("weatherrain", config.weather.raintrigger);
+      }
+      if (config.wateringindex) {
+         showCheckbox ("waterindexenable", config.wateringindex.enable);
+         showInput ("waterindexprov", config.wateringindex.provider);
+         if (config.wateringindex.adjust) {
+            showInput ("waterindexmin", config.wateringindex.adjust.min);
+            showInput ("waterindexmax", config.wateringindex.adjust.max);
+         }
+      }
+   });
+
+   hideAll();
+};
+</script>
+<head>
+   <title></title>
+</head>
+<body>
+   <button class="configbutton" onclick="visible('configglobal')">Global Parameters</button>
+   <br>
+   <div name="configglobal" class="hidable" display="none">
+   <form name="sprkrconfig">
+     <table>
+        <tr>
+           <td>Web Port:</td>
+           <td><input type="text" size="5" name="webport" placeholder="Port number"></td>
+        </tr>
+        <tr>
+           <td>UDP Port:</td>
+           <td><input type="text" size="5" name="udpport" placeholder="Port number"></td>
+        </tr>
+        <tr>
+           <td>Location:</td>
+           <td><input type="text" name="location" placeholder="Name"></td>
+        </tr>
+        <tr>
+           <td>Zip Code:</td>
+           <td><input type="text" name="zipcode"></td>
+        </tr>
+        <tr>
+           <td>Time Zone:</td>
+           <td><input type="text" name="timezone"></td>
+        </tr>
+        <tr>
+           <td></td>
+           <td><input type="checkbox" name="production"> Production mode</td>
+        </tr>
+        <tr>
+           <td></td>
+           <td><input type="checkbox" name="raindelay"> Allow rain delay</td>
+        </tr>
+     </table>
+   </form>
+   </div>
+   <br>
+   <button class="addbutton" onclick="addZone()">Add</button>
+   <button class="configbuttonwithadd" onclick="visible('configzone')">Zones</button>
+   <br>
+   <div name="configzone" class="hidable" display="none">
+   <form name="sprkrconfig">
+     <table name="zonetable">
+     <tr><th>Index</th><th>Name</th><th>Monthly adjustment</th><th>Pulse</th><th>Pause</th><th>Manual</th></tr>
+     </table>
+   </form>
+   </div>
+   <br>
+   <button class="addbutton" onclick="addProgram()">Add</button>
+   <button class="configbuttonwithadd" onclick="visible('configprogram')">Programs</button>
+   <br>
+   <div name="configprogram" class="hidable" display="none">
+   <form name="sprkrconfig">
+     <table class="programtable" name="programtable">
+     </table>
+   </form>
+   </div>
+   <br>
+   <button class="addbutton" onclick="addCalendar()">Add</button>
+   <button class="configbuttonwithadd" onclick="visible('configcalendar')">Calendars</button>
+   <br>
+   <div name="configcalendar" class="hidable" display="none">
+   <form name="sprkrconfig">
+     <table name="calendartable" width="100%">
+     <tr>
+        <th width="5%">Index</th>
+        <th width="15%">Name</th>
+        <th width="15%">Format</th>
+        <th width="5%">Disabled</th>
+        <th width="60%">Source</th>
+     </tr>
+     </table>
+   </form>
+   </div>
+   <br>
+   <button class="addbutton" onclick="addSeason()">Add</button>
+   <button class="configbuttonwithadd" onclick="visible('configseason')">Seasons</button>
+   <br>
+   <div name="configseason" class="hidable" display="none">
+   <form name="sprkrconfig">
+     <table name="seasontable">
+        <tr>
+        <th>Season</th>
+        <th>January</th>
+        <th>February</th>
+        <th>March</th>
+        <th>April</th>
+        <th>May</th>
+        <th>June</th>
+        <th>July</th>
+        <th>August</th>
+        <th>September</th>
+        <th>October</th>
+        <th>November</th>
+        <th>December</th>
+        </tr>
+     </table>
+   </form>
+   </div>
+   <br>
+   <button class="addbutton" onclick="addMonthly()">Add</button>
+   <button class="configbuttonwithadd" onclick="visible('configmonthly')">Monthly adjustment</button>
+   <br>
+   <div name="configmonthly" class="hidable" display="none">
+   <form name="sprkrconfig">
+     <table name="monthlytable">
+        <tr>
+        <th>Schedule</th>
+        <th>Jan</th>
+        <th>Feb</th>
+        <th>Mar</th>
+        <th>Apr</th>
+        <th>May</th>
+        <th>Jun</th>
+        <th>Jul</th>
+        <th>Aug</th>
+        <th>Sep</th>
+        <th>Oct</th>
+        <th>Nov</th>
+        <th>Dec</th>
+        </tr>
+     </table>
+   </form>
+   </div>
+   <br>
+   <button class="configbutton" onclick="visible('configevent')">Events</button>
+   <br>
+   <div name="configevent" class="hidable" display="none">
+   <form name="sprkrconfig">
+      Cleanup events older than <input type="text" size="3" name="eventcleanup"> days.
+      <br>
+      <input type="checkbox" name="eventsyslog"> Use syslog
+   </form>
+   </div>
+   <br>
+   <button class="addbutton" onclick="addWeatherRefresh()">Add</button>
+   <button class="configbuttonwithadd" onclick="visible('configweather')">Weather Underground Service</button>
+   <br>
+   <div name="configweather" class="hidable" display="none">
+   <form name="sprkrconfig">
+     <table>
+        <tr>
+           <td></td>
+           <td><input type="checkbox" name="weatherenable"> Query weather conditions</td>
+        </tr>
+        <tr>
+           <td>Key:</td>
+           <td><input type="text" size="16" name="weatherkey" placeholder="Hexadecimal"></td>
+        </tr>
+        <tr>
+           <td style="vertical-align:top">Refresh times:</td>
+           <td>
+              <table name="weatherrefreshtable"></table>
+           </td>
+        </tr>
+        <tr>
+           <td>Rain delay trigger:</td>
+           <td><input type="text" name="weatherrain" placeholder="Inches"></td>
+        </tr>
+        <tr>
+           <td></td>
+           <td><input type="checkbox" name="weatheradjustenable"> Allow adjustments based on weather conditions</td>
+        </tr>
+        <tr>
+           <td>Minimal adjustment:</td>
+           <td><input type="text" size="3" name="weathermin" placeholder="%"></td>
+        </tr>
+        <tr>
+           <td>Maximal adjustment:</td>
+           <td><input type="text" size="3" name="weathermax" placeholder="%"></td>
+        </tr>
+        <tr>
+           <td>Base temperature:</td>
+           <td><input type="text" name="weathertemp" placeholder="Farenheit"></td>
+        </tr>
+        <tr>
+           <td>Base humidity:</td>
+           <td><input type="text" name="weatherhumid" placeholder="%"></td>
+        </tr>
+        <tr>
+           <td>Sensitivity:</td>
+           <td><input type="text" name="weathersens" placeholder="%"></td>
+        </tr>
+     </table>
+   </form>
+   </div>
+   <br>
+   <button class="addbutton" onclick="addWaterIndexRefresh()">Add</button>
+   <button class="configbuttonwithadd" onclick="visible('configwaterindex')">Watering Index Service</button>
+   <br>
+   <div name="configwaterindex" class="hidable" display="none">
+   <form name="sprkrconfig">
+     <table>
+        <tr>
+           <td></td>
+           <td><input type="checkbox" name="waterindexenable"> Allow adjustments based on watering index</td>
+        </tr>
+        <tr>
+           <td>Provider:</td>
+           <td><input type="text" size="3" name="waterindexprov" placeholder="Name"></td>
+        </tr>
+        <tr>
+           <td style="vertical-align:top">Refresh times:</td>
+           <td>
+              <table name="waterindexrefreshtable"></table>
+           </td>
+        </tr>
+        <tr>
+           <td>Minimal adjustment:</td>
+           <td><input type="text" size="3" name="waterindexmin" placeholder="%"></td>
+        </tr>
+        <tr>
+           <td>Maximal adjustment:</td>
+           <td><input type="text" size="3" name="waterindexmax" placeholder="%"></td>
+        </tr>
+     </table>
+   </form>
+   </div>
+</body>
+</html>
+

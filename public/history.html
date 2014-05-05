@@ -7,19 +7,6 @@
 <script>
 window.onload = function() {
 
-   function getHistory (zones, callback) {
-      var command = new XMLHttpRequest();
-      command.open("GET", "/history");
-      command.onreadystatechange = function () {
-         if (command.readyState === 4 && command.status === 200) {
-            var response = JSON.parse(command.responseText);
-            // var type = command.getResponseHeader("Content-Type");
-            callback(zones, response.history);
-         }
-      }
-      command.send(null);
-   }
-
    function newColumn (text, index) {
       var column = document.createElement("td");
       column.innerHTML = text;
@@ -33,20 +20,56 @@ window.onload = function() {
 
    function showParent (event) {
       if (event.parent)
-         return 'IN PROGRAM '+event.parent;
+         return 'PROGRAM '+event.parent;
       return 'MANUAL';
    }
 
-   sprinklerUpdate();
+   function showAdjustment (event) {
+      if (event.adjust != null) {
+         if (event.ratio) {
+            return 'ADJUSTED '+event.ratio+'% USING '+event.adjust;
+         } else if (event.raw) {
+            // OBSOLETE Support old event format.
+            var ratio = Math.floor((event.seconds * 100) / event.raw);
+            return 'ADJUSTED '+ratio+'% USING '+event.adjust;
+         } else {
+            return 'ADJUSTED USING '+event.adjust;
+         }
+      }
+      return 'NO ADJUST';
+   }
 
    var lastEventId = null;
 
+   function weatherInfo (event, prefix) {
+      var description;
+      if (event.temperature != null) {
+         description = ''+prefix+' '+event.temperature+' F, '+event.humidity+'%';
+         if (event.rainsensor)
+            description = description+', RAINING';
+         else if (event.rain >= 0.01)
+            description = description+', '+event.rain+' in';
+         else
+            description = description+', NO RAIN';
+      } else {
+         description = 'NO WEATHER DATA';
+      }
+
+      if (event.adjustment != null)
+         description = description+', ADJUST '+event.adjustment+'%';
+      else
+         description = description+', DISABLED';
+
+      if (event.source != null) {
+         description = description+' FROM '+event.source;
+      }
+      return description;
+   }
+
    function updateHistory(config) {
 
-      getHistory (config.zones, function (zones, history) {
-         if ((lastEventId != null) && (lastEventId == history[0]._id)) {
-            return;
-         }
+      sprinklerHistory (function (history) {
+
          lastEventId = history[0]._id;
 
          var table = document.getElementsByClassName ('sprkrevent')[0];
@@ -64,47 +87,28 @@ window.onload = function() {
                action = 'START';
                if (event.program != null) {
                   item = 'PROGRAM '+event.program;
-                  if (event.temperature != null) {
-                     description = 'WEATHER '+event.temperature+' F, '+event.humidity+'%';
-                     if (event.rainsensor)
-                        description = description+', RAINING';
-                     else if (event.rain >= 0.01)
-                        description = description+', '+event.rain+' in';
-                     else
-                        description = description+', NO RAIN';
-
-                     if (event.adjustment != null)
-                        description = description+', ADJUST '+event.adjustment+'%';
-                     else
-                        description = description+', DISABLED';
-                  } else {
-                     description = 'NO WEATHER DATA';
-                  }
+                  description = weatherInfo (event, 'WEATHER');
                } else if (event.zone != null) {
-                  item = showZone(zones, event);
+                  item = showZone(config.zones, event);
                   description = 'FOR '+sprinklerShowDuration(event.seconds);
                   description += ', '+showParent(event);
+                  description += ', '+showAdjustment(event);
                }
                break;
             case 'END':
-               action = 'END';
+            case 'CANCEL':
+               action = event.action;
                if (event.program != null) {
                   item = 'PROGRAM '+event.program;
                } else if (event.zone != null) {
-                  item = showZone(zones, event);
+                  item = showZone(config.zones, event);
                   description = 'AFTER '+sprinklerShowDuration(event.runtime);
                   description += ', '+showParent(event);
                }
                break;
-            case 'CANCEL':
-               action = 'CANCEL';
-               item = showZone(zones, event);
-               description = 'AFTER '+sprinklerShowDuration(event.runtime);
-               description += ', '+showParent(event);
-               break;
             case 'SKIP':
                action = 'SKIP';
-               item = showZone(zones, event);
+               item = showZone(config.zones, event);
                description = showParent(event);
                break;
             case 'STARTUP':
@@ -114,6 +118,17 @@ window.onload = function() {
             case 'IDLE':
                action = 'IDLE';
                item = 'SYSTEM';
+               break;
+            case 'WEATHER':
+               // This is for compatibility with existing logs only.
+               action = 'UPDATE';
+               item = event.action;
+               description = weatherInfo (event, '');
+               break;
+            case 'UPDATE':
+               action = 'UPDATE';
+               item = event.source;
+               description = weatherInfo (event, '');
                break;
             }
             var row = document.createElement("tr");
@@ -126,9 +141,19 @@ window.onload = function() {
       });
    }
 
+   function checkHistory (config) {
+      sprinklerLatestEvent (function (event) {
+         if ((lastEventId == null) || (lastEventId != event._id)) {
+            updateHistory (config);
+         }
+      });
+   }
+
+   sprinklerUpdate();
+
    sprinklerConfig (function (config) {
       updateHistory(config);
-      setInterval (function() {updateHistory(config)}, 5000);
+      setInterval (function() {checkHistory(config)}, 1000);
    });
 }
 </script>

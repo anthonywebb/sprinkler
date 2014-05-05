@@ -5,36 +5,72 @@
       href="/sprinkler.css" title="Sprinkler">
 <script src="/sprinklerlib.js"></script>
 <script>
-   sprinklerInfo();
+window.onload = function() {
+
+   sprinklerStatus (function (status) {
+      var table = document.getElementsByClassName ('sprkrcalendar')[0];
+      for (var i = 0; i < status.calendars.length; i++) {
+         var outer = document.createElement("tr");
+         var inner = document.createElement("td");
+         inner.innerHTML = status.calendars[i].name+':';
+         outer.appendChild(inner);
+         inner = document.createElement("td");
+         inner.innerHTML = '<span class="sprkrdata calendar'+i+'"></span>';
+         outer.appendChild(inner);
+         table.appendChild(outer);
+      }
+      sprinklerInfo();
+   });
+}
 </script>
 <title></title>
 </head>
 <body>
+   <div class="sprkrpanel">
+   <div class="sprkrpane">
    <table class="sprkrstatus">
-   <tr><td><span class="sprkrtitle">Main Menu</span></td></tr>
-   <tr><td>Controler:</td></tr>
-   <tr><td><span class="sprkrdata hostname"></span></td></tr>
-   <tr><td>Zone Status:</td></tr>
-   <tr><td><span class="sprkrdata activezone"></span></td></tr>
-   <tr><td>Program:</td></tr>
-   <tr><td><span class="sprkrdata activeprogram"></span></td></tr>
-   <tr><td>Rain delay:</td></tr>
-   <tr><td><span class="sprkrdata raindelay"></span></td></tr>
-   <tr><td>Weather update:</td></tr>
-   <tr><td><span class="sprkrdata weatherupdated"></span></td></tr>
-   <tr><td>Temperature:</td></tr>
-   <tr><td><span class="sprkrdata temperature"></span></td></tr>
-   <tr><td>Humidity:</td></tr>
-   <tr><td><span class="sprkrdata humidity"></span></td></tr>
-   <tr><td>Rain:</td></tr>
-   <tr><td><span class="sprkrdata rain"></span> (<span class="sprkrdata rainsensor"></span>)</td></tr>
+   <tr><td colspan="2"><span class="sprkrtitle">Main Menu</span></td></tr>
+   <tr><td>Controler:</td>
+   <td><span class="sprkrdata hostname"></span></td></tr>
+   <tr><td>Zone Status:</td>
+   <td><span class="sprkrdata activezone"></span></td></tr>
+   <tr><td>Program:</td>
+   <td><span class="sprkrdata activeprogram"></span></td></tr>
+   <tr><td>Rain delay:</td>
+   <td><span class="sprkrdata raindelay"></span></td></tr>
    </table>
+   </div>
+   <br>
+   <div class="sprkrpane">
+   <table class="sprkrstatus">
+   <tr><td colspan="2"><span class="sprkrtitle">Weather</span></td></tr>
+   <tr><td>Updated:</td>
+   <td><span class="sprkrdata weatherupdated"></span></td></tr>
+   <tr><td>Temperature:</td>
+   <td><span class="sprkrdata temperature"></span></td></tr>
+   <tr><td>Humidity:</td>
+   <td><span class="sprkrdata humidity"></span></td></tr>
+   <tr><td>Rain:</td>
+   <td><span class="sprkrdata rain"></span> (<span class="sprkrdata rainsensor"></span>)</td></tr>
+   <tr><td>Watering Index:</td>
+   <td><span class="sprkrdata adjustment"></span></td></tr>
+   </table>
+   </div>
+   <br>
+   <div class="sprkrpane">
+   <table class="sprkrstatus sprkrcalendar">
+   <tr><td colspan="2"><span class="sprkrtitle">Calendars</span></td></tr>
+   </table>
+   </div>
+   </div>
    <table class="sprkrmenu">
-   <tr><td class="sprkrmenucell"><A class="sprkrmenuitem" HREF="/zones.html">Zones</A></td></tr>
+   <tr><td><button class="panelbutton" onclick="sprinklerOnOff()"><span class="zonename">On/Off</span></button></td></tr>
    <tr><td class="sprkrmenucell"><A class="sprkrmenuitem" HREF="/history.html">History</A></td></tr>
-   <tr><td class="sprkrmenucell"><A class="sprkrmenuitem" HREF="/programs.html">Programs</A></td></tr>
-   <tr><td class="sprkrmenucell"><A class="sprkrmenuitem" HREF="/calprog.html">Calendar Programs</A></td></tr>
+   <tr><td class="sprkrmenucell"><A class="sprkrmenuitem" HREF="/zones.html">Zones</A></td></tr>
+   <tr><td class="sprkrmenucell"><A class="sprkrmenuitem" HREF="/programs.html">Manual Start</A></td></tr>
+   <tr><td class="sprkrmenucell"><A class="sprkrmenuitem" HREF="/config.html">Configure</A></td></tr>
    <tr><td class="sprkrmenucell"><A class="sprkrmenuitem" HREF="/advanced.html">Advanced</A></td></tr>
+   <tr><td class="sprkrmenucell"><A class="sprkrmenuitem" HREF="javascript:sprinklerRefresh()">Refresh</A></td></tr>
    </table> 
 </body>
 </html>
