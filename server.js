@@ -628,21 +628,36 @@ function programOn(program) {
     // the list of zones in the queue after it has run its course: without
     // cloning we would destroy the list of zones in the program itself.
     //
+    // We build the zone activation list in two phases:
+    // Phase 1: retrieve the list of zones, calculate the adjusted runtime.
+    // Phase 2: run the program as many times as necessary to cover the
+    //          adjusted time with runs no longer than the configured pulse.
+    //          Put the minimal pause between each iteration to cover the
+    //          configured pause.
+    //
+    var zonecontext = new Array();
+    var timeremaining = 0;
+
     for (var i = 0; i < program.zones.length; i++) {
+
+        var zone = + program.zones[i].zone;
+        var seconds = + program.zones[i].seconds;
+
+        zonecontext[i] = new Object();
+        zonecontext[i].zone = zone;
+        zonecontext[i].raw = seconds;
 
         // Add the capability to disable one zone, when activated from
         // a program. Keep the ability to control it manually. This is
         // typically for a zone with a problem (broken pipe, leak, etc).
         // This way one can avoid this zone without modifying all programs.
         //
-        var zoneconfig = config.zones[program.zones[i].zone];
+        var zoneconfig = config.zones[zone];
         if (zoneconfig.manual) {
-           event.record({action: 'SKIP', zone:program.zones[i].zone-0, parent: program.name, seconds: 0});
+           event.record({action: 'SKIP', zone:zone, parent: program.name, seconds: 0});
+           zonecontext[i].adjusted = 0;
            continue;
         }
-
-        var zone = program.zones[i].zone;
-        var seconds = program.zones[i].seconds;
 
         // Each zone may have its own predefined adjustment settings, or else
         // use the "default" one. Use the weather adjustment only if there
@@ -689,31 +704,56 @@ function programOn(program) {
                 source = "WEATHER";
             }
         }
-        if (source != null) {
-           var actualratio = Math.floor((adjusted * 100) / seconds);
-           var remainder = adjusted;
-           if (zoneconfig.pulse) {
-              while (remainder > zoneconfig.pulse) {
-                 runqueue.push({zone:zone,seconds:zoneconfig.pulse,adjust:source,ratio:actualratio,parent:program.name});
-                 if (zoneconfig.pause) {
-                    runqueue.push({zone:null,seconds:zoneconfig.pause,parent:program.name});
-                 }
-                 remainder -= zoneconfig.pulse;
-              }
-           }
-           runqueue.push({zone:zone,seconds:remainder,adjust:source,ratio:actualratio,parent:program.name});
+
+        timeremaining += adjusted
+
+        zonecontext[i].source = source;
+        zonecontext[i].adjusted = adjusted;
+        zonecontext[i].ratio = Math.floor((adjusted * 100) / seconds);
+
+        if (zoneconfig.pulse) {
+           zonecontext[i].pulse = zoneconfig.pulse;
+           zonecontext[i].pause = zoneconfig.pause;
         } else {
-           var remainder = seconds;
-           if (zoneconfig.pulse) {
-              while (remainder > zoneconfig.pulse) {
-                 runqueue.push({zone:zone,seconds:zoneconfig.pulse,parent:program.name});
-                 if (zoneconfig.pause) {
-                    runqueue.push({zone:null,seconds:zoneconfig.pause,parent:program.name});
-                 }
-                 remainder -= zoneconfig.pulse;
-              }
-           }
-           runqueue.push({zone:zone,seconds:remainder,parent:program.name});
+           zonecontext[i].pulse = zonecontext[i].adjusted
+           zonecontext[i].pause = 0;
+        }
+    }
+
+    // In phase 2, loop as long as there is still a zone that must be run.
+    //
+    while (timeremaining > 0) {
+        timeremaining = 0;
+        var pause = 0;
+        for (var i = 0; i < program.zones.length; i++) {
+
+            if (zonecontext[i].adjusted <= 0) continue;
+
+            var runtime = zonecontext[i].adjusted;
+            if (runtime > zonecontext[i].pulse) {
+                runtime = zonecontext[i].pulse;
+                if (pause < zonecontext[i].pause) {
+                   pause = zonecontext[i].pause;
+                }
+            }
+            zonecontext[i].adjusted -= runtime;
+            timeremaining += zonecontext[i].adjusted; // time left after this.
+
+            var zone = + zonecontext[i].zone;
+
+            if (zonecontext[i].source != null) {
+               runqueue.push({
+                   zone:zone,
+                   seconds:runtime,
+                   adjust:zonecontext[i].source,
+                   ratio:zonecontext[i].ratio,
+                   parent:program.name});
+            } else {
+               runqueue.push({zone:zone,seconds:runtime,parent:program.name});
+            }
+        }
+        if (pause > 0) {
+            runqueue.push({zone:null,seconds:pause,parent:program.name});
         }
     }
 
