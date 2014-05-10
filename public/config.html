@@ -10,6 +10,38 @@ var editing = null;
 
 var gui = new Object();
 
+function saveConfig () {
+
+   var form = document.forms;
+
+   var newconfig = new Object();
+   newconfig.on = editing.on;
+
+   newconfig.webserver = new Object();
+   newconfig.webserver.port = form.global.webport.value;
+   newconfig.webserver.host = "127.0.0.1";
+
+   newconfig.udp = new Object();
+   newconfig.udp.port = form.global.udpport.value;
+
+   newconfig.location = form.global.location.value;
+   newconfig.zipcode = form.global.zipcode.value;
+   newconfig.timezone = form.global.timezone.value;
+   newconfig.production = form.global.production.checked;
+   newconfig.raindelay = form.global.raindelay.checked;
+
+   newconfig.event = new Object();
+   newconfig.event.syslog = form.event.eventsyslog.checked;
+
+   newconfig.wateringindex = new Object();
+   newconfig.wateringindex.enable = form.waterindex.waterindexenable.checked;
+   newconfig.wateringindex.adjust = new Object();
+   newconfig.wateringindex.adjust.min = form.waterindex.waterindexmin.value;
+   newconfig.wateringindex.adjust.max = form.waterindex.waterindexmax.value;
+
+   console.log ("config = "+JSON.stringify(newconfig));
+}
+
 function showInput (name, content) {
    var elements = document.getElementsByName (name);
    for (var i = 0; i < elements.length; i++) {
@@ -682,10 +714,12 @@ window.onload = function() {
    <title></title>
 </head>
 <body class="sprkrtext">
+   <div class="sprkrbuttons"><button class="configactionbutton" onclick="saveConfig()">Save</button></div>
+   <br>
    <button class="configbutton" onclick="visible('configglobal')">Global Parameters</button>
    <br>
+   <form name="global">
    <div name="configglobal" class="hidable" display="none">
-   <form name="sprkrconfig">
      <table>
         <tr>
            <td>Web Port:</td>
@@ -716,35 +750,35 @@ window.onload = function() {
            <td><input type="checkbox" name="raindelay"> Allow rain delay</td>
         </tr>
      </table>
-   </form>
    </div>
+   </form>
    <br>
    <button class="addbutton" onclick="addZone()">Add</button>
    <button class="configbuttonwithadd" onclick="visible('configzone')">Zones</button>
    <br>
+   <form name="zone">
    <div name="configzone" class="hidable" display="none">
-   <form name="sprkrconfig">
      <table name="zonetable">
      <tr><th>Index</th><th>Name</th><th>Monthly adjustment</th><th>Pulse</th><th>Pause</th><th>Manual</th></tr>
      </table>
-   </form>
    </div>
+   </form>
    <br>
    <button class="addbutton" onclick="addProgram()">Add</button>
    <button class="configbuttonwithadd" onclick="visible('configprogram')">Programs</button>
    <br>
+   <form name="program">
    <div name="configprogram" class="hidable" display="none">
-   <form name="sprkrconfig">
      <table class="programtable" name="programtable">
      </table>
-   </form>
    </div>
+   </form>
    <br>
    <button class="addbutton" onclick="addCalendar()">Add</button>
    <button class="configbuttonwithadd" onclick="visible('configcalendar')">Calendars</button>
    <br>
+   <form name="calendar">
    <div name="configcalendar" class="hidable" display="none">
-   <form name="sprkrconfig">
      <table name="calendartable" width="100%">
      <tr>
         <th width="5%">Index</th>
@@ -754,14 +788,14 @@ window.onload = function() {
         <th width="60%">Source</th>
      </tr>
      </table>
-   </form>
    </div>
+   </form>
    <br>
    <button class="addbutton" onclick="addSeason()">Add</button>
    <button class="configbuttonwithadd" onclick="visible('configseason')">Seasons</button>
    <br>
+   <form name="season">
    <div name="configseason" class="hidable" display="none">
-   <form name="sprkrconfig">
      <table name="seasontable">
         <tr>
         <th>Season</th>
@@ -779,14 +813,14 @@ window.onload = function() {
         <th>December</th>
         </tr>
      </table>
-   </form>
    </div>
+   </form>
    <br>
    <button class="addbutton" onclick="addMonthly()">Add</button>
    <button class="configbuttonwithadd" onclick="visible('configmonthly')">Monthly adjustment</button>
    <br>
+   <form name="monthly">
    <div name="configmonthly" class="hidable" display="none">
-   <form name="sprkrconfig">
      <table name="monthlytable">
         <tr>
         <th>Schedule</th>
@@ -804,24 +838,24 @@ window.onload = function() {
         <th>Dec</th>
         </tr>
      </table>
-   </form>
    </div>
+   </form>
    <br>
    <button class="configbutton" onclick="visible('configevent')">Events</button>
    <br>
+   <form name="event">
    <div name="configevent" class="hidable" display="none">
-   <form name="sprkrconfig">
       Cleanup events older than <input type="text" size="3" name="eventcleanup"> days.
       <br>
-      <input type="checkbox" name="eventsyslog"> Use syslog
-   </form>
+      <input type="checkbox" name="eventsyslog"> Use syslog</input>
    </div>
+   </form>
    <br>
    <button class="addbutton" onclick="addWeatherRefresh()">Add</button>
    <button class="configbuttonwithadd" onclick="visible('configweather')">Weather Underground Service</button>
    <br>
+   <form name="weather">
    <div name="configweather" class="hidable" display="none">
-   <form name="sprkrconfig">
      <table>
         <tr>
            <td></td>
@@ -866,14 +900,14 @@ window.onload = function() {
            <td><input type="text" name="weathersens" placeholder="%"></td>
         </tr>
      </table>
-   </form>
    </div>
+   </form>
    <br>
    <button class="addbutton" onclick="addWaterIndexRefresh()">Add</button>
    <button class="configbuttonwithadd" onclick="visible('configwaterindex')">Watering Index Service</button>
    <br>
+   <form name="waterindex">
    <div name="configwaterindex" class="hidable" display="none">
-   <form name="sprkrconfig">
      <table>
         <tr>
            <td></td>
