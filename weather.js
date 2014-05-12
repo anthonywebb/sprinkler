@@ -56,6 +56,14 @@
 //
 //      return the average temperature for the previous day.
 //
+//   weather.high ();
+//
+//      return the high temperature for the previous day.
+//
+//   weather.low ();
+//
+//      return the low temperature for the previous day.
+//
 //   weather.humidity ();
 //
 //      return the average humidity for the previous day.
@@ -318,6 +326,20 @@ function temperature () {
    return null;
 }
 exports.temperature = temperature;
+
+exports.high = function () {
+   if (weatherConditions) {
+      return weatherConditions.history.dailysummary[0].maxtempi - 0;
+   }
+   return null;
+}
+
+exports.low = function () {
+   if (weatherConditions) {
+      return weatherConditions.history.dailysummary[0].mintempi - 0;
+   }
+   return null;
+}
 
 function humidity () {
    if (weatherConditions) {
