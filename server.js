@@ -732,11 +732,18 @@ function programOn(program) {
             var runtime = zonecontext[i].adjusted;
             if (runtime > zonecontext[i].pulse) {
                 runtime = zonecontext[i].pulse;
-                if (pause < zonecontext[i].pause) {
+                zonecontext[i].adjusted -= runtime;
+                if ((zonecontext[i].adjusted < 15) &&
+                    (zonecontext[i].adjusted < zonecontext[i].pulse)) {
+                   // Forget the last run since it is too short.
+                   zonecontext[i].adjusted = 0;
+                } else if (pause < zonecontext[i].pause) {
+                   // There will be a next run: plan for the pause.
                    pause = zonecontext[i].pause;
                 }
+            } else {
+                zonecontext[i].adjusted = 0;
             }
-            zonecontext[i].adjusted -= runtime;
             timeremaining += zonecontext[i].adjusted; // time left after this.
 
             var zone = + zonecontext[i].zone;
