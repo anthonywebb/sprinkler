@@ -394,7 +394,7 @@ app.get('/calendar/programs', function(req, res){
 
 app.get('/weather', function(req, res){
     if (weather.status()) {
-        res.json({status:'ok',hostname:os.hostname(),temperature:weather.temperature(),humidity:weather.humidity(),rain:weather.rain(),rainsensor:weather.rainsensor(),adjustment:weather.adjustment()});
+        res.json({status:'ok',hostname:os.hostname(),temperature:weather.temperature(),high:weather.high(),low:weather.low(),humidity:weather.humidity(),rain:weather.rain(),rainsensor:weather.rainsensor(),adjustment:weather.adjustment()});
     } else {
         res.json({status:'ok'});    
     }

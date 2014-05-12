@@ -162,6 +162,8 @@ function sprinklerUpdate () {
                if (weathercmd.responseText == '') return;
                var response = JSON.parse(weathercmd.responseText);
                sprinklerSetContent ('temperature', ''+response.temperature+' F');
+               sprinklerSetContent ('maxtemp', ''+response.high+' F');
+               sprinklerSetContent ('mintemp', ''+response.low+' F');
                sprinklerSetContent ('humidity', ''+response.humidity+'%');
                sprinklerSetContent ('rain', ''+response.rain+' in');
                sprinklerSetContent ('rainsensor', response.rainsensor?'SENSOR ON':'SENSOR OFF');
