@@ -39,6 +39,7 @@ function saveConfig () {
 
    newconfig.event = new Object();
    newconfig.event.syslog = form.event.eventsyslog.checked;
+   newconfig.event.cleanup = form.event.eventcleanup.value;
 
    newconfig.weather = new Object();
    newconfig.weather.enable = form.weather.weatherenable.checked;
