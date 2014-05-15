@@ -92,8 +92,8 @@ function saveConfig () {
       if (form.zones[prefix+'pause'].value) {
          newconfig.zones[i].pause = form.zones[prefix+'pause'].value;
       }
-      if (form.zones[prefix+'manual'].value) {
-         newconfig.zones[i].manual = form.zones[prefix+'manual'].checked;
+      if (form.zones[prefix+'manual'].checked) {
+         newconfig.zones[i].manual = true;
       }
    }
 
