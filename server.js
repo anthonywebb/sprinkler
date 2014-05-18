@@ -421,6 +421,19 @@ function schedulePrograms (programs, now) {
         if (timeofday != programs[i].start) continue;
         if (! programs[i].active) continue;
 
+        if (programs[i].exclusions) {
+           var excluded = false;
+           for (var j = 0; j < programs[i].exclusions.length; j++) {
+              var exclusion = programs[i].exclusions[j];
+              if ((exclusion.day() == today) &&
+                  (exclusion.format('HH:mm') == timeofday)) {
+                 excluded = true;
+                 break;
+              }
+           }
+           if (excluded) continue;
+        }
+
         // Allow enabling a program for a specific season only (user-defined)
         if (programs[i].season) {
            if (config.seasons) {

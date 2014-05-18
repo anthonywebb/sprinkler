@@ -44,6 +44,8 @@
 //
 // CONFIGURATION
 //
+//   timezone              The default time zone used by this controller.
+//
 //   location              The name of the location used for this sprinkler
 //                         controller. An event will be loaded only if it's
 //                         location matches the controller's location.
@@ -93,6 +95,8 @@ function UnsupportedCalendar (format) {
    this.status = 'disabled';
 }
 
+var defaultTimezone = null;
+
 var imported = new Object();
 imported.calendar = new Array();
 imported.programs = new Array();
@@ -126,6 +130,8 @@ exports.configure = function (config, options) {
       imported.programs = new Array();
       return;
    }
+
+   defaultTimezone = config.timezone;
 
    for (var i = 0; i < config.calendars.length; i++) {
 
@@ -189,10 +195,15 @@ function buildZoneIndex(config) {
 //
 function decodeEventsFromICalendar (text) {
 
+   // Restore long lines per RFC5545, section 3.1
+   text = text.replace(/\r\n[ \t]/g,"");
+
    var lines = text.split('\r\n');
    var events = new Array();
    var event;
    var inVevent = false;
+   var inVtimezone = false;
+   var timezone = defaultTimezone;
 
    for (var i = 0; i < lines.length; i++) {
 
@@ -203,6 +214,12 @@ function decodeEventsFromICalendar (text) {
 
       case 'BEGIN':
          switch (operands[1]) {
+         case 'VTIMEZONE':
+            if (inVtimezone) {
+              errorLog("BEGIN VTIMEZONE inside TIMEZONE at line " + i + ": " + text);
+            }
+            inVtimezone = true;
+            break;
          case 'VEVENT':
             if (inVevent) {
               errorLog("BEGIN VEVENT inside EVENT at line " + i + ": " + text);
@@ -211,6 +228,15 @@ function decodeEventsFromICalendar (text) {
             inVevent = true;
             break;
          }
+         break;
+
+      case 'RECURRENCE-ID':
+         errorLog ("keyword '"+attributes[0]+"' is not supported yet");
+         break;
+
+      case 'TZID':
+         if (!inVtimezone) break;
+         timezone = operands[1];
          break;
 
       case 'LOCATION':
@@ -266,10 +292,43 @@ function decodeEventsFromICalendar (text) {
          }
          break;
 
+      case 'EXDATE':
+         if (!inVevent) break;
+         if (operands.length > 1) {
+            var tzid = null;
+            if (attributes.length > 1) {
+               for (var k = 1; k < attributes.length; k++) {
+                  var attribute = attributes[k].split('=');
+                  if (attribute.length > 1) {
+                     if (attribute[0] == 'TZID') {
+                        tzid = attribute[1];
+                     }
+                  }
+               }
+            }
+            var values = operands[1].split(';');
+            event.exdate = new Array();
+            for (var k = 0; k < values.length; k++) {
+               var exclusion = new Object();
+               if (tzid) exclusion.tzid = tzid;
+               exclusion.time = values[k];
+               event.exdate[event.exdate.length] = exclusion;
+            }
+         }
+         break;
+
       case 'END':
          switch (operands[1]) {
+         case 'VTIMEZONE':
+            if (inVtimezone) {
+               inVtimezone = false;
+            }
+            break;
          case 'VEVENT':
             if (inVevent) {
+               if (timezone) {
+                  event.timezone = timezone;
+               }
                events[events.length] = event;
                inVevent = false;
             }
@@ -326,12 +385,15 @@ function descriptionToOptions (text) {
 
 // --------------------------------------------------------------------------
 // Decode date and time in a timezone-aware way
-function dateToMoment(date) {
+//
+function dateToMoment(date, defaulttimezone) {
    var time = date.time.slice(0,8)+date.time.slice(9,15);
-   if (date.tzid) {
+   if (date.time.match(/Z$/)) {
+      return moment(time+'+0000', 'YYYYMMDDHHmmSSZ');
+   } else if (date.tzid) {
       return moment.tz(time, "YYYYMMDDHHmmSS", date.tzid);
    }
-   return moment(time+'+0000', 'YYYYMMDDHHmmSSZ');
+   return moment.tz(time, 'YYYYMMDDHHmmSS', defaulttimezone);
 }
 
 // --------------------------------------------------------------------------
@@ -341,7 +403,7 @@ var iCalendarDaysDictionary = ['SU', 'MO', 'TU','WE', 'TH', 'FR', 'SA'];
 
 function iCalendarToProgram (calendar_name, event) {
 
-   var start = dateToMoment(event.start);
+   var start = dateToMoment(event.start, event.timezone);
    if (!start.isValid()) return null;
 
    var program = new Object();
@@ -354,6 +416,14 @@ function iCalendarToProgram (calendar_name, event) {
    program.repeat = 'none'; // Default.
 
    if (event.rrule) {
+      // RFC 5545, section 3.3.10: UNTIL
+      if (event.rrule.until != undefined) {
+         var until = dateToMoment({time:event.rrule.until,tzid:event.start.tzid}, event.timezone);
+         if (moment().diff(until) >= 0) {
+            infoLog ('ignoring recurring event '+program.name+' (expired)');
+            return null;
+         }
+      }
       // Set the time of day, interval and day filter.
       switch (event.rrule.freq) {
       case 'DAILY':
@@ -379,9 +449,22 @@ function iCalendarToProgram (calendar_name, event) {
          break;
 
       default:
-         errorLog ('ignoring  event '+program.name+' (unsupported frequence '+event.rrule.freq+')');
+         errorLog ('ignoring recurring event '+program.name+' (unsupported frequence '+event.rrule.freq+')');
          program = null;
          return null;
+      }
+   } else {
+      if (moment().diff(start) >= 0) {
+         infoLog ('ignoring single event '+program.name+' (expired)');
+         return null;
+      }
+   }
+
+   if (event.exdate) {
+      program.exclusions = new Array();
+      for (var i = 0; i < event.exdate.length; i++) {
+         program.exclusions[program.exclusions.length] =
+            dateToMoment(event.exdate[i], event.timezone);
       }
    }
 
@@ -390,10 +473,10 @@ function iCalendarToProgram (calendar_name, event) {
 
    if (! program.zones) {
       errorLog('ignoring  event '+program.name+' (unsupported zone name)');
-      program = null;
-   } else {
-      infoLog ('importing event '+program.name+' at '+program.start+' starting on '+program.date);
+      return null;
    }
+
+   infoLog ('importing event '+program.name+' at '+program.start+' starting on '+program.date);
    return program;
 }
 
