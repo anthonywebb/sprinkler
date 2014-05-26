@@ -112,11 +112,10 @@ window.onload = function() {
                description = showParent(event);
                break;
             case 'STARTUP':
-               action = 'START';
-               item = 'SYSTEM';
-               break;
+            case 'ON':
+            case 'OFF':
             case 'IDLE':
-               action = 'IDLE';
+               action = event.action;
                item = 'SYSTEM';
                break;
             case 'WEATHER':

@@ -138,7 +138,7 @@ exports.configure = function (config, options) {
       provider = config.wateringindex.provider;
    }
    url = wateringProviders[provider].url.replace ('\{ZIP\}', config.zipcode);
-console.log ('Watering index URL: '+url);
+   debugLog ('watering index '+provider+' URL: '+url);
 
    if (config.wateringindex.refresh) {
       for (var i = 0; i < config.wateringindex.refresh.length; i++) {

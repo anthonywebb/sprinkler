@@ -45,7 +45,7 @@ var debugLog = function (text) {}
 
 if (options.debug) {
     debugLog = function (text) {
-        console.log ('[DEBUG] '+text);
+        console.log ('[DEBUG] '+moment().format('YYYY/MM/DD HH:mm')+' '+text);
     }
 }
 debugLog ('starting sprinkler');
@@ -147,9 +147,11 @@ app.use(missingHandler);
 app.get('/onoff', function(req, res){
     if (config.on == false) {
         config.on = true;
+        event.record({action: 'ON'});
         res.json({status:'ok',hostname:os.hostname(),msg:'Watering enabled'});
     } else {
         config.on = false;
+        event.record({action: 'OFF'});
         res.json({status:'ok',hostname:os.hostname(),msg:'Watering disabled'});
     }
     saveConfig (config);
@@ -408,38 +410,91 @@ app.get('/hardware/info', function(req, res){
 // SCHEDULER
 //////////////////////////////////////
 
+// Analyze one watering program to see if it must be activated.
+function scheduleOneProgram (program, now) {
+
+   // Eliminate immediately a program that would not start
+   // at this exact time of day.
+   if (now.format('HH:mm') != program.start) return false;
+
+   // Eliminate a program that has become obsolete.
+   if (program.until) {
+      if (until.isBefore(now)) return false;
+   }
+
+   // Eliminate occurrences that have been excluded (either modified and
+   // replaced by an exception, or deleted).
+   if (program.exclusions) {
+      for (var j = 0; j < program.exclusions.length; j++) {
+         if (Math.abs(now.diff(program.exclusions[j])) < 60000) {
+            return false; // This occurrence was excluded.
+         }
+      }
+   }
+
+   // Check the date when the program starts (or started) to be active.
+   if (program.date) {
+      var date = moment(program.date+' '+program.start, 'YYYYMMDD HH:mm');
+      var delta = now.diff(date, 'days');
+      if (delta < 0) return false; // Starts at a future date.
+      debugLog ('delta from '+date.format()+' to '+now.format()+' is '+delta);
+   } else {
+      // No start date yet: force the program to start today.
+      program.date = now.format('YYYYMMDD');
+      delta = 0;
+      debugLog ('make program '+program.name+' start today');
+   }
+
+   // Now check if the program should be activated today.
+   switch (program.repeat) {
+   case 'weekly':
+       // Runs weekly, on specific days of the week.
+       debugLog ('Checking day for program '+program.name+' (weekly)');
+       if (program.days[now.day()]) {
+           return true;
+       }
+       break;
+
+   case 'daily':
+       // Runs daily, at some day interval.
+       debugLog ('Checking day for program '+program.name+' (daily, interval='+program.interval+', delta='+delta+')');
+       if ((delta % program.interval) == 0) {
+           return true;
+       }
+       break;;
+
+   default:
+       // Otherwise, this program runs at the specified date (once).
+       debugLog ('Checking day for program '+program.name+' (once, delta='+delta+')');
+       program.active = false; // Do not run it anymore.
+       if (delta == 0) {
+           return true;
+       }
+   }
+   return false;
+}
+
 // Go through one list of watering programs to search one to activate.
 //
-function schedulePrograms (programs, now) {
+function scheduleProgramList (programs, now) {
+
     if (programs == null) return;
-    var today = now.day();
-    var timeofday = now.format('HH:mm');
 
-    for(var i = 0; i < programs.length; i++){
-        // Eliminate immediately a program that would not start
-        // at this exact time, or was disabled.
-        if (timeofday != programs[i].start) continue;
-        if (! programs[i].active) continue;
+    for (var i = 0; i < programs.length; i++) {
 
-        if (programs[i].exclusions) {
-           var excluded = false;
-           for (var j = 0; j < programs[i].exclusions.length; j++) {
-              var exclusion = programs[i].exclusions[j];
-              if ((exclusion.day() == today) &&
-                  (exclusion.format('HH:mm') == timeofday)) {
-                 excluded = true;
-                 break;
-              }
-           }
-           if (excluded) continue;
-        }
+        var program = programs[i];
+
+        // Eliminate immediately a program that was disabled.
+        // (this also disable all associated exception programs).
+        if (! program.active) continue;
 
         // Allow enabling a program for a specific season only (user-defined)
-        if (programs[i].season) {
+        // (this also impacts all associated exception programs).
+        if (program.season) {
            if (config.seasons) {
               var giveup = false;
               for (var si = 0; si < config.seasons.length; si++) {
-                 if (config.seasons[si].name == programs[i].season) {
+                 if (config.seasons[si].name == program.season) {
                     if (config.seasons[si].weekly) {
                        if (! config.seasons[si].weekly[now.week()]) {
                           giveup = true;
@@ -456,40 +511,22 @@ function schedulePrograms (programs, now) {
            }
         }
 
-        // Check when the program starts (or started) to be active.
-        if (programs[i].date) {
-           var date = moment(programs[i].date+' '+timeofday, 'YYYYMMDD HH:mm');
-           var delta = now.diff(date, 'days');
-           if (delta < 0) continue; // Starts at a future date.
-        } else {
-           delta = 0; // Force today.
+        // Each exception is a non-repeat program on its own, which replaces
+        // the normal program's occurrence.
+        var launched = false;
+        if (program.exceptions) {
+           for (var j = 0; j < program.exceptions.length; j++) {
+              if (scheduleOneProgram(program.exceptions[j], now)) {
+                 programOn(program.exceptions[j]);
+                 launched = true;
+                 break;
+              }
+           }
         }
-
-        // Now check if the program should be activated today.
-        switch (programs[i].repeat) {
-        case 'weekly':
-            // Runs weekly, on specific days of the week.
-            debugLog ('Checking day for program '+programs[i].name+' (weekly)');
-            if(programs[i].days[today]){
-                programOn(programs[i]);
-            }
-            break;
-
-        case 'daily':
-            // Runs daily, at some day interval.
-            debugLog ('Checking day for program '+programs[i].name+' (daily, interval='+programs[i].interval+', delta='+delta+')');
-            if ((delta % programs[i].interval) == 0) {
-                programOn(programs[i]);
-            }
-            break;;
-
-        default:
-            // Otherwise, this program runs at the specified date (once).
-            debugLog ('Checking day for program '+programs[i].name+' (once, delta='+delta+')');
-            if (delta == 0) {
-                programOn(programs[i]);
-            }
-            programs[i].active = false; // Do not run it anymore.
+        if (! launched) {
+           if (scheduleOneProgram(program, now)) {
+              programOn(program);
+           }
         }
     }
 }
@@ -500,7 +537,9 @@ function scheduler () {
 
     if (config.on == false) return;
 
-    var now = moment().tz(config.timezone);
+    var now = moment();
+    now.millisecond(0);
+    now.second(0);
 
     var thisminute = now.minute();
     if (thisminute == lastScheduleCheck) return;
@@ -524,8 +563,8 @@ function scheduler () {
         if (rainTimer > +now) return;
     }
 
-    schedulePrograms (config.programs, now);
-    schedulePrograms (calendar.programs(), now);
+    scheduleProgramList (config.programs, now);
+    scheduleProgramList (calendar.programs(), now);
 }
 
 ///////////////////////////////////////
