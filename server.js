@@ -419,7 +419,7 @@ function scheduleOneProgram (program, now) {
 
    // Eliminate a program that has become obsolete.
    if (program.until) {
-      if (until.isBefore(now)) return false;
+      if (program.until.isBefore(now)) return false;
    }
 
    // Eliminate occurrences that have been excluded (either modified and
