@@ -44,10 +44,12 @@
 //
 // CONFIGURATION
 //
+//   timezone              The default time zone used by this controller.
+//
 //   location              The name of the location used for this sprinkler
 //                         controller. An event will be loaded only if it's
-//                         location matches the controller's location.
-//                         (Default: 'home'.)
+//                         location matches the controller's location. This
+//                         match is not case sensitive. (Default: 'home'.)
 //
 //   calendars             The calendar module configuration array.
 //
@@ -93,6 +95,8 @@ function UnsupportedCalendar (format) {
    this.status = 'disabled';
 }
 
+var defaultTimezone = null;
+
 var imported = new Object();
 imported.calendar = new Array();
 imported.programs = new Array();
@@ -127,6 +131,8 @@ exports.configure = function (config, options) {
       return;
    }
 
+   defaultTimezone = config.timezone;
+
    for (var i = 0; i < config.calendars.length; i++) {
 
       var format = config.calendars[i].format;
@@ -160,8 +166,9 @@ exports.configure = function (config, options) {
       }
       imported.calendar[i].source = config.calendars[i].source;
    }
-   imported.location = config.location;
-   if (imported.location == null) {
+   if (config.location) {
+      imported.location = config.location.toLowerCase();
+   } else {
       imported.location = 'home';
    }
 
@@ -189,10 +196,15 @@ function buildZoneIndex(config) {
 //
 function decodeEventsFromICalendar (text) {
 
+   // Restore long lines per RFC5545, section 3.1
+   text = text.replace(/\r\n[ \t]/g,"");
+
    var lines = text.split('\r\n');
    var events = new Array();
    var event;
    var inVevent = false;
+   var inVtimezone = false;
+   var timezone = defaultTimezone;
 
    for (var i = 0; i < lines.length; i++) {
 
@@ -203,6 +215,12 @@ function decodeEventsFromICalendar (text) {
 
       case 'BEGIN':
          switch (operands[1]) {
+         case 'VTIMEZONE':
+            if (inVtimezone) {
+              errorLog("BEGIN VTIMEZONE inside TIMEZONE at line " + i + ": " + text);
+            }
+            inVtimezone = true;
+            break;
          case 'VEVENT':
             if (inVevent) {
               errorLog("BEGIN VEVENT inside EVENT at line " + i + ": " + text);
@@ -211,6 +229,35 @@ function decodeEventsFromICalendar (text) {
             inVevent = true;
             break;
          }
+         break;
+
+      case 'TZID':
+         if (!inVtimezone) break;
+         timezone = operands[1];
+         break;
+
+      case 'RECURRENCE-ID':
+         if (!inVevent) break;
+         event.recurrence = new Object();
+         if (attributes.length > 1) {
+            for (var k = 1; k < attributes.length; k++) {
+               var attribute = attributes[k].split('=');
+               if (attribute.length > 1) {
+                  event.recurrence[attribute[0].toLowerCase()] = attribute[1];
+               }
+            }
+         }
+         event.recurrence.time = operands[1];
+         break;
+
+      case 'SEQUENCE':
+         if (!inVevent) break;
+         event.sequence = operands[1];
+         break;
+
+      case 'UID':
+         if (!inVevent) break;
+         event.uid = operands[1];
          break;
 
       case 'LOCATION':
@@ -239,7 +286,11 @@ function decodeEventsFromICalendar (text) {
                }
             }
          }
-         event.start.time = operands[1];
+         if (event.start.value == 'DATE') {
+            event.start = null; // We do not care about an all day event.
+         } else {
+            event.start.time = operands[1];
+         }
          break;
 
       case 'RRULE':
@@ -266,11 +317,48 @@ function decodeEventsFromICalendar (text) {
          }
          break;
 
+      case 'EXDATE':
+         if (!inVevent) break;
+         if (operands.length > 1) {
+            var tzid = null;
+            if (attributes.length > 1) {
+               for (var k = 1; k < attributes.length; k++) {
+                  var attribute = attributes[k].split('=');
+                  if (attribute.length > 1) {
+                     if (attribute[0] == 'TZID') {
+                        tzid = attribute[1];
+                     }
+                  }
+               }
+            }
+            var values = operands[1].split(';');
+            event.exdate = new Array();
+            for (var k = 0; k < values.length; k++) {
+               var exclusion = new Object();
+               if (tzid) exclusion.tzid = tzid;
+               exclusion.time = values[k];
+               event.exdate[event.exdate.length] = exclusion;
+            }
+         }
+         break;
+
       case 'END':
          switch (operands[1]) {
+         case 'VTIMEZONE':
+            if (inVtimezone) {
+               inVtimezone = false;
+            }
+            break;
          case 'VEVENT':
             if (inVevent) {
-               events[events.length] = event;
+               if (event.start) {
+                  if (timezone) {
+                     event.timezone = timezone;
+                  }
+                  events[events.length] = event;
+               } else {
+                  debugLog ('ignoring all day event '+event.summary);
+               }
                inVevent = false;
             }
             break;
@@ -326,12 +414,19 @@ function descriptionToOptions (text) {
 
 // --------------------------------------------------------------------------
 // Decode date and time in a timezone-aware way
-function dateToMoment(date) {
+//
+function dateToMoment(date, defaulttimezone) {
    var time = date.time.slice(0,8)+date.time.slice(9,15);
-   if (date.tzid) {
-      return moment.tz(time, "YYYYMMDDHHmmSS", date.tzid);
+   var result;
+   if (date.time.match(/Z$/)) {
+      result = moment(time+'+0000', 'YYYYMMDDHHmmSSZ');
+   } else if (date.tzid) {
+      result = moment.tz(time, "YYYYMMDDHHmmSS", date.tzid);
+   } else {
+      result = moment.tz(time, 'YYYYMMDDHHmmSS', defaulttimezone);
    }
-   return moment(time+'+0000', 'YYYYMMDDHHmmSSZ');
+   // Switch from the calendar's timezone to the local timezone.
+   return moment(result.valueOf());
 }
 
 // --------------------------------------------------------------------------
@@ -341,8 +436,12 @@ var iCalendarDaysDictionary = ['SU', 'MO', 'TU','WE', 'TH', 'FR', 'SA'];
 
 function iCalendarToProgram (calendar_name, event) {
 
-   var start = dateToMoment(event.start);
-   if (!start.isValid()) return null;
+   var now = moment();
+   var start = dateToMoment(event.start, event.timezone);
+   if (!start.isValid()) {
+      infoLog ('ignoring event '+event.summary+' (invalid start '+event.start+')');
+      return null;
+   }
 
    var program = new Object();
    program.active = true;
@@ -352,8 +451,18 @@ function iCalendarToProgram (calendar_name, event) {
    program.date = start.format('YYYYMMDD');
 
    program.repeat = 'none'; // Default.
+   program.exclusions = new Array();
 
    if (event.rrule) {
+      // RFC 5545, section 3.3.10: UNTIL
+      if (event.rrule.until != undefined) {
+         var until = dateToMoment({time:event.rrule.until,tzid:event.start.tzid}, event.timezone);
+         if (now.diff(until) >= 60000) { // Up to a minute leeway.
+            infoLog ('ignoring recurring event '+program.name+' (expired)');
+            return null;
+         }
+         program.until = until;
+      }
       // Set the time of day, interval and day filter.
       switch (event.rrule.freq) {
       case 'DAILY':
@@ -379,21 +488,60 @@ function iCalendarToProgram (calendar_name, event) {
          break;
 
       default:
-         errorLog ('ignoring  event '+program.name+' (unsupported frequence '+event.rrule.freq+')');
+         errorLog ('ignoring recurring event '+program.name+' (unsupported frequence '+event.rrule.freq+')');
          program = null;
+         return null;
+      }
+
+      // Record the exceptions.
+
+      if (event.exceptions) {
+         // An exception is a modified event that replace an existing
+         // occurrence: this is both an additional event and an exclusion
+         // of the original event occurrence.
+         program.exceptions = new Array();
+         for (var item in event.exceptions) {
+            var exception = event.exceptions[item];
+            var update = new Object();
+            var replaces = dateToMoment (exception.recurrence, event.timezone);
+            var start = dateToMoment(exception.start, event.timezone);
+            if ((now.diff(start) > 60000) &&
+                (now.diff(replaces) > 60000)) continue; // Expired.
+            update.zones = descriptionToZones (exception.description);
+            update.options = descriptionToOptions (exception.description);
+            update.repeat = 'none';
+            update.date = start.format('YYYYMMDD');
+            update.start = start.format('HH:mm');
+            update.name = program.name; // Same as parent.
+            program.exceptions[program.exceptions.length] = update;
+            program.exclusions[program.exclusions.length] = replaces;
+         }
+      }
+
+   } else {
+      if (now.diff(start) >= 60000) { // Up to a minute leeway.
+         infoLog ('ignoring single event '+program.name+' (expired)');
          return null;
       }
    }
 
+   if (event.exdate) {
+      for (var i = 0; i < event.exdate.length; i++) {
+         program.exclusions[program.exclusions.length] =
+            dateToMoment(event.exdate[i], event.timezone);
+      }
+   }
+
+   program.uid = event.uid;
    program.zones = descriptionToZones (event.description);
    program.options = descriptionToOptions (event.description);
 
    if (! program.zones) {
       errorLog('ignoring  event '+program.name+' (unsupported zone name)');
-      program = null;
-   } else {
-      infoLog ('importing event '+program.name+' at '+program.start+' starting on '+program.date);
+      return null;
    }
+
+   infoLog ('importing event '+program.name+' at '+program.start+' starting on '+program.date);
    return program;
 }
 
@@ -425,11 +573,66 @@ ICalendar.prototype.import = function (text) {
       }
    }
 
+   // Link together related events (same UID). The original (main) event
+   // are the root elements, the other events are updates to main events.
+   // Since the events are listed in arbitrary order, we need two phases:
+   // map all the main events and then map the update events as exceptions
+   // to their respective main events. After that we only need to consider
+   // the main events.
+
+   var eventmap = new Object();
+   var mainevents = new Array();
+
+   for (var i = 0; i < events.length; i++) {
+      if (events[i].recurrence == undefined) {
+         debugLog ('processing event '+events[i].summary+' (main event)');
+         eventmap[events[i].uid] = events[i];
+         mainevents[mainevents.length] = events[i];
+      }
+   }
+
+   for (var i = 0; i < events.length; i++) {
+      if (events[i].recurrence) {
+         debugLog ('processing event '+events[i].summary+' (event update)');
+         if (eventmap[events[i].uid]) {
+            var parent = eventmap[events[i].uid];
+            if (parent.exceptions == undefined) {
+               parent.exceptions = new Object();
+            }
+            var item = events[i].recurrence.time;
+            if (parent.exceptions[item]) {
+               // Only remember the most recent update.
+               if (events[i].sequence > parent.exceptions[item].sequence) {
+                  parent.exceptions[item] = events[i];
+               }
+            } else {
+               parent.exceptions[item] = events[i];
+            }
+         }
+      }
+   }
+
+   events = mainevents;
+   eventmap = null;
+
+   // Now we have the information needed to generate the watering programs.
+
    for (var i = 0; i < events.length; i++) {
 
+      debugLog ('processing event '+events[i].summary+' (create program)');
+      for (var item in events[i].exceptions) {
+         debugLog ('event '+events[i].summary+' updated at '+item);
+      }
+
       // Ignore all-day events and events for other controllers
-      if (!events[i].start) continue;
-      if (events[i].location != imported.location) continue;
+      if (!events[i].start) {
+         infoLog ('ignoring event '+events[i].summary+' (all day event)');
+         continue;
+      }
+      if (events[i].location.toLowerCase() != imported.location) {
+         infoLog ('ignoring event '+events[i].summary+' (not this location)');
+         continue;
+      }
 
       var program = iCalendarToProgram (pendingCalendar.name, events[i]);
       if (program != null) {
@@ -610,12 +813,12 @@ function loadNextCalendar () {
 
       if (pendingCalendar.source.match ("file:.*")) {
 
-         infoLog ('accessing file '+pendingCalendar.source.slice(5));
+         debugLog ('accessing file '+pendingCalendar.source.slice(5));
          loadFileCalendar();
          continue; // Load next calendar.
       }
 
-      infoLog ('accessing '+imported.calendar[i].source);
+      debugLog ('accessing '+imported.calendar[i].source);
 
       if (imported.calendar[i].source.match ("https://.*")) {
          loadWebCalendar(https);
@@ -648,12 +851,17 @@ exports.refresh = function () {
 
    if (imported.calendar.length == 0) return;
 
-   var hour = new Date().getHours();
+   var now = new Date();
+   var hour = now.getHours();
 
    // Throttle when to request for information, to limit traffic.
+   // We try to get an update at the end of the hour, because most
+   // programs tend to start at the beginning of the hour.
+   //
    if (hour == lastUpdateHour) return;
-   lastUpdateHour = hour;
+   if (now.getMinutes() < 55) return;
 
+   lastUpdateHour = hour;
    loadCalendars();
 }
 

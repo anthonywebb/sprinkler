@@ -37,9 +37,18 @@
 //
 //      This function retrieves the user configuration.
 //
+//   sprinklerSaveConfig(config);
+//
+//      This function sends the user configuration to the server. The
+//      configuration sent will replace the current one.
+//
 //   sprinklerStatus(callback);
 //
 //      This function retrieves the current status.
+//
+//   sprinklerHardwareInfo(callback);
+//
+//      This function retrieves the current hardware information.
 //
 //   sprinklerZoneOn(index, duration);
 //
@@ -153,6 +162,8 @@ function sprinklerUpdate () {
                if (weathercmd.responseText == '') return;
                var response = JSON.parse(weathercmd.responseText);
                sprinklerSetContent ('temperature', ''+response.temperature+' F');
+               sprinklerSetContent ('maxtemp', ''+response.high+' F');
+               sprinklerSetContent ('mintemp', ''+response.low+' F');
                sprinklerSetContent ('humidity', ''+response.humidity+'%');
                sprinklerSetContent ('rain', ''+response.rain+' in');
                sprinklerSetContent ('rainsensor', response.rainsensor?'SENSOR ON':'SENSOR OFF');
@@ -198,9 +209,34 @@ function sprinklerConfig (callback) {
    command.send(null);
 }
 
+function sprinklerSaveConfig (config) {
+   var command = new XMLHttpRequest();
+   command.open("POST", "/config");
+   command.setRequestHeader('Content-Type', 'application/json');
+   command.onreadystatechange = function () {
+      if (command.readyState === 4 && command.status !== 200) {
+         window.alert ('Operation failed (error '+command.status+')!');
+      }
+   }
+   command.send(JSON.stringify(config));
+}
+
 function sprinklerStatus (callback) {
    var command = new XMLHttpRequest();
    command.open("GET", "/status");
+   command.onreadystatechange = function () {
+      if (command.readyState === 4 && command.status === 200) {
+         var status = JSON.parse(command.responseText);
+         // var type = command.getResponseHeader("Content-Type");
+         callback(status);
+      }
+   }
+   command.send(null);
+}
+
+function sprinklerHardwareInfo (callback) {
+   var command = new XMLHttpRequest();
+   command.open("GET", "/hardware/info");
    command.onreadystatechange = function () {
       if (command.readyState === 4 && command.status === 200) {
          var status = JSON.parse(command.responseText);

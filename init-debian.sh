@@ -53,8 +53,16 @@ do_start()
 	#   2 if daemon could not be started
 	start-stop-daemon --start --quiet --pidfile $PIDFILE --exec $DAEMON --test > /dev/null \
 		|| return 1
-	start-stop-daemon --start --quiet --pidfile $PIDFILE --chuid $SPRINKLER_USER --group gpio --chdir /var/lib/sprinkler --make-pidfile --background --exec $DAEMON -- \
-		$DAEMON_ARGS \
+
+	for i in errors stdout
+	do
+		rm -f /var/lib/sprinkler/$i
+		touch /var/lib/sprinkler/$i
+		chown $SPRINKLER_USER /var/lib/sprinkler/$i
+		chgrp gpio /var/lib/sprinkler/$i
+	done
+
+	start-stop-daemon --start --quiet --pidfile $PIDFILE --chuid $SPRINKLER_USER --group gpio --chdir /var/lib/sprinkler --make-pidfile --background --no-close --exec $DAEMON -- $DAEMON_ARGS 2>>/var/lib/sprinkler/errors >>/var/lib/sprinkler/stdout \
 		|| return 2
 }
 

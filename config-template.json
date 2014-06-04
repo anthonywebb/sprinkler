@@ -28,6 +28,34 @@
     "on" = true,
     "production": false,
     "event": {"syslog": false, "cleanup": 90},
+    "calendars": [
+        {
+            "name":"example",
+            "format":"iCalendar",
+            "source":"http://somewhere",
+            "disabled":true
+        }
+    ],
+    "weather": {
+        "enable":false,
+        "key":"your-weather-underground-key-here",
+        "raintrigger":"0.25",
+        "refresh":["5:01","21:03"],
+        "adjust":{
+            "enable":false,
+            "min":0,
+            "max":200,
+            "temperature":65,
+            "humidity":30,
+            "sensitivity":70
+        }
+    },
+    "wateringindex":{
+        "enable":true,
+        "provider":"waterdex",
+        "adjust":{"min":"31","max":"152"},
+        "refresh":["5:00","21:02"]
+    },
     "seasons": [
         {
             "name":"wet",
@@ -68,11 +96,11 @@
             "season":"dry",
             "start":"01:41",
             "date":"20140401",
-            "days":[true,true,true,true,true,true,true],
             "interval":2,
+            "options":{"append":true},
             "zones":[
-                {"zone":1,"seconds":15},
-                {"zone":3,"seconds":10}
+                {"zone":1,"seconds":30},
+                {"zone":3,"seconds":20}
             ]
         }
     ]
