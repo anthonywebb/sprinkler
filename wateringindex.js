@@ -15,6 +15,15 @@
 //   The update is asynchronous: it is recommended to refresh the watering
 //   index information a few minutes before a program is activated.
 //
+//   This module support the following watering index sources:
+//
+//     WATERDEX   The watering index from waterdex.com. This uses
+//                the ZIP code to find the proper index.
+//
+//     MWDSOCAL   The watering index from the Metropolitain Water District
+//                of Southern California. The index is valid for the Los
+//                Angeles area.
+//
 // DESCRIPTION
 //
 //   var wateringindex = require('./wateringindex');
@@ -100,16 +109,54 @@ var adjustParameters = new Object();
 var wateringProviders = {
     waterdex: {
        id: 'WATERDEX',
-       url: 'http://wi.waterdex.com/waterdex/index?zipcode={ZIP}&tmpl=waterdex'
+       url: 'http://wi.waterdex.com/waterdex/index?zipcode={ZIP}&tmpl=waterdex',
+       extract: function (text) {
+          text = text.substring (text.search(/<[hH]4><[pP]>/),
+                                 text.search(/<\/[pP]><\/[hH]4>/));
+          var index = text.substring (text.search(/[0-9]{2,3}%/));
+          index = index.substring (0, index.search(/%/));
+          return parseInt(index, 10);
+       }
+    },
+    mwdsocal: {
+       id: 'MWDSOCAL',
+       url: 'http://www.mwdh2o.com/RSS/rsswi.xml',
+       extract: function (text) {
+          debugLog ('Searching index in '+text);
+          text = text.toLowerCase();
+          while (text.search(/<item>/)) {
+             var item = text.substring (text.search(/<item>/),
+                                        text.search(/<\/item>/));
+             text = text.substring (text.search(/<\/item>/));
+
+             debugLog ('Found item '+item);
+             if (item.search('daily watering index')) {
+                item = item.substring (item.search(/<description>/),
+                                       item.search(/<\/description>/));
+                item = item.substring (item.search(/[0-9]/));
+                var index = parseInt(item, 10);
+                debugLog ('found MWDSOCAL watering index '+index);
+                return index;
+             }
+          }
+          errorLog ('No daily index found in MWDSOCAL RSS data');
+          return 100;
+       }
     }
 };
+
 var url = null;
 var provider = 'waterdex';
+var extractWateringIndex = wateringProviders.waterdex.extract;
 
 var debugLog = function (text) {}
 
 function verboseLog (text) {
-   console.log ('[DEBUG] Weather: '+text);
+   console.log ('[DEBUG] WateringIndex: '+text);
+}
+
+function errorLog (text) {
+   console.log ('[ERROR] WateringIndex: '+text);
 }
 
 function restoreDefaults () {
@@ -136,9 +183,15 @@ exports.configure = function (config, options) {
 
    if (config.wateringindex.provider) {
       provider = config.wateringindex.provider;
+      if (!wateringProviders[provider]) {
+         errorLog ('invalid provider '+provider+', falling back to waterdex');
+         provider = 'waterdex';
+      }
    }
    url = wateringProviders[provider].url.replace ('\{ZIP\}', config.zipcode);
    debugLog ('watering index '+provider+' URL: '+url);
+
+   extractWateringIndex = wateringProviders[provider].extract;
 
    if (config.wateringindex.refresh) {
       for (var i = 0; i < config.wateringindex.refresh.length; i++) {
@@ -218,15 +271,6 @@ function getWateringIndex () {
    } else if (time > lastUpdate + updateInterval) {
       getWateringIndexNow();
    }
-}
-
-function extractWateringIndex (text) {
-
-   text = text.substring (text.search(/<[hH]4><[pP]>/),
-                          text.search(/<\/[pP]><\/[hH]4>/));
-   index = text.substring (text.search(/[0-9]{2,3}%/));
-   index = index.substring (0, index.search(/%/));
-   return parseInt(index, 10);
 }
 
 function getWateringIndexNow () {
