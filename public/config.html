@@ -62,7 +62,7 @@ function saveConfig () {
 
    newconfig.wateringindex = new Object();
    newconfig.wateringindex.enable = form.waterindex.waterindexenable.checked;
-   newconfig.wateringindex.provider = form.waterindex.waterindexprov.value;
+   newconfig.wateringindex.provider = form.waterindex.waterindexprovider.value;
    newconfig.wateringindex.adjust = new Object();
    newconfig.wateringindex.adjust.min = form.waterindex.waterindexmin.value;
    newconfig.wateringindex.adjust.max = form.waterindex.waterindexmax.value;
@@ -193,6 +193,19 @@ function showInput (name, content) {
    var elements = document.getElementsByName (name);
    for (var i = 0; i < elements.length; i++) {
       if (content || (content === 0)) elements[i].value = ''+content;
+   }
+}
+
+function showSelected (name, content) {
+   var elements = document.getElementsByName (name);
+   for (var i = 0; i < elements.length; i++) {
+      var element = elements[i];
+      for (var j = 0; j < element.options.length; j++) {
+         if (element.options[j].value == content) {
+            element.options[j].selected = true;
+            break;
+         }
+      }
    }
 }
 
@@ -930,9 +943,10 @@ window.onload = function() {
          if (config.wateringindex) {
             showCheckbox ("waterindexenable", config.wateringindex.enable);
             if (config.wateringindex.provider) {
-               showInput ("waterindexprov", config.wateringindex.provider);
+               showSelected ("waterindexprovider",
+                             config.wateringindex.provider);
             } else {
-               showInput ("waterindexprov", 'waterdex');
+               showSelected ("waterindexprovider", 'waterdex');
             }
             if (config.wateringindex.adjust) {
                showInput ("waterindexmin", config.wateringindex.adjust.min);
@@ -1149,7 +1163,12 @@ window.onload = function() {
         </tr>
         <tr>
            <td>Provider:</td>
-           <td><input type="text" size="16" name="waterindexprov" placeholder="Name"></td>
+           <td>
+              <select name="waterindexprovider">
+                 <option value="waterdex" selected>Waterdex.com</option> 
+                 <option value="mwdsocal">Metropolitan Water District of Southern California</option>
+              </select>
+           </td>
         </tr>
         <tr>
            <td style="vertical-align:top">Refresh times:</td>

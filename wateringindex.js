@@ -111,8 +111,9 @@ var wateringProviders = {
        id: 'WATERDEX',
        url: 'http://wi.waterdex.com/waterdex/index?zipcode={ZIP}&tmpl=waterdex',
        extract: function (text) {
-          text = text.substring (text.search(/<[hH]4><[pP]>/),
-                                 text.search(/<\/[pP]><\/[hH]4>/));
+          text = text.toLowerCase();
+          text = text.substring (text.search(/<h4><p>/),
+                                 text.search(/<\/p><\/h4>/));
           var index = text.substring (text.search(/[0-9]{2,3}%/));
           index = index.substring (0, index.search(/%/));
           return parseInt(index, 10);
@@ -146,7 +147,7 @@ var wateringProviders = {
 };
 
 var url = null;
-var provider = 'waterdex';
+var provider = null;
 var extractWateringIndex = wateringProviders.waterdex.extract;
 
 var debugLog = function (text) {}
@@ -164,7 +165,7 @@ function restoreDefaults () {
    url = null;
    enable = false;
    raintrigger = null;
-   refreshSchedule = new Array();;
+   refreshSchedule = new Array();
    provider = 'waterdex';
 
    adjustParameters.min = 30;
@@ -177,21 +178,29 @@ exports.configure = function (config, options) {
    if (options && options.debug) {
       debugLog = verboseLog;
    }
+   var oldprovider = provider;
    restoreDefaults();
 
    if (! config.wateringindex) return;
 
    if (config.wateringindex.provider) {
-      provider = config.wateringindex.provider;
+      provider = config.wateringindex.provider.toLowerCase();
       if (!wateringProviders[provider]) {
-         errorLog ('invalid provider '+provider+', falling back to waterdex');
-         provider = 'waterdex';
+         errorLog ('invalid provider '+provider+', falling back to default');
+         restoreDefaults();
       }
+   }
+   if (oldprovider != provider) {
+      debugLog ('changing provider from '+oldprovider+' to '+provider);
+      wateringindexData = null; // Data was from the previous provider.
+   } else {
+      debugLog ('same provider '+provider);
    }
    url = wateringProviders[provider].url.replace ('\{ZIP\}', config.zipcode);
    debugLog ('watering index '+provider+' URL: '+url);
 
    extractWateringIndex = wateringProviders[provider].extract;
+
 
    if (config.wateringindex.refresh) {
       for (var i = 0; i < config.wateringindex.refresh.length; i++) {
@@ -227,7 +236,7 @@ exports.configure = function (config, options) {
       // (Do it in 10 minutes.)
       lastUpdate = new Date().getTime() - updateInterval + 600000;
    } else {
-      // That is the first time we ask. Do it now.
+      // We have no existing data anyway, ask for data now.
       getWateringIndexNow();
    }
 }

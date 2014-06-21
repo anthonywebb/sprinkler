@@ -72,6 +72,7 @@ function resetCounts() {
 
 function activateConfig () {
 
+    debugLog ('activating new configuration');
     event.configure(config, options);
     hardware.configure (hardwareConfig, config, options);
     hardware.rainInterrupt (rainCallback);
@@ -83,7 +84,7 @@ function activateConfig () {
     resetCounts();
 }
 
-function saveConfig (body) {
+function saveConfig (body, activate) {
 
     var data = JSON.stringify(body);
 
@@ -94,6 +95,9 @@ function saveConfig (body) {
         }
         debugLog('Configuration saved successfully.');
         config = body;
+        if (activate) {
+           activateConfig();
+        }
     });
 }
 
@@ -163,8 +167,7 @@ app.get('/config', function(req, res){
 
 app.post('/config', function(req, res){
     //debugLog(req.body);
-    saveConfig (req.body);
-    activateConfig();
+    saveConfig (req.body, true);
     res.json({status:'ok',msg:'config saved'});
 });
 
@@ -593,7 +596,7 @@ setInterval(function(){
 
 // Add the listener for periodic information refresh.
 //
-// This does not need to be fast (here: 10mn), but each refresh function
+// This does not need to be fast (here: 1mn), but each refresh function
 // called is free to do nothing until a longer delay has expired.
 //
 setInterval(function(){
