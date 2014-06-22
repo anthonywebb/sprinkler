@@ -843,9 +843,18 @@ function programOn(program) {
 function zoneMaster (index, on) {
     if (config.zones[index].master !== undefined) {
        var master = config.zones[index].master;
-       if ((master >= 0) && (master < zonecount)) {
-          hardware.setZone (master, on);
-          hardware.apply();
+       if ((master != index) && (master >= 0) && (master < zonecount)) {
+          if (on) {
+             // Open this master before its own master, if any
+             hardware.setZone (master, true);
+             hardware.apply();
+             zoneMaster (master, true);
+          } else {
+             // Close this master after its own master, if any.
+             zoneMaster (master, false);
+             hardware.setZone (master, false);
+             hardware.apply();
+          }
        }
     }
 }
