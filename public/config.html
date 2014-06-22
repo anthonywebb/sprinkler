@@ -92,6 +92,9 @@ function saveConfig () {
       if (form.zones[prefix+'pause'].value) {
          newconfig.zones[i].pause = form.zones[prefix+'pause'].value;
       }
+      if (form.zones[prefix+'master'].value) {
+         newconfig.zones[i].master = form.zones[prefix+'master'].value;
+      }
       if (form.zones[prefix+'manual'].checked) {
          newconfig.zones[i].manual = true;
       }
@@ -305,6 +308,16 @@ function showOneZone (zones, i, elements) {
       pauseinput.placeholder = 'Seconds';
       pausecolumn.appendChild(pauseinput);
       outer.appendChild(pausecolumn);
+
+      var mastercolumn = document.createElement("td");
+      var masterinput = document.createElement("input");
+      masterinput.type = 'text';
+      masterinput.name = prefix+'master';
+      if (zones[i].master)
+         masterinput.value = zones[i].master;
+      masterinput.placeholder = 'Index';
+      mastercolumn.appendChild(masterinput);
+      outer.appendChild(mastercolumn);
 
       var manualcolumn = document.createElement("td");
       var manualinput = document.createElement("input");
@@ -829,6 +842,9 @@ window.onload = function() {
          titleline.appendChild(titlecolumn);
          titlecolumn = document.createElement("th");
          titlecolumn.innerHTML = 'Pause';
+         titleline.appendChild(titlecolumn);
+         titlecolumn = document.createElement("th");
+         titlecolumn.innerHTML = 'Master';
          titleline.appendChild(titlecolumn);
          titlecolumn = document.createElement("th");
          titlecolumn.innerHTML = 'Manual';
