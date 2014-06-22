@@ -62,7 +62,7 @@ function saveConfig () {
 
    newconfig.wateringindex = new Object();
    newconfig.wateringindex.enable = form.waterindex.waterindexenable.checked;
-   newconfig.wateringindex.provider = form.waterindex.waterindexprov.value;
+   newconfig.wateringindex.provider = form.waterindex.waterindexprovider.value;
    newconfig.wateringindex.adjust = new Object();
    newconfig.wateringindex.adjust.min = form.waterindex.waterindexmin.value;
    newconfig.wateringindex.adjust.max = form.waterindex.waterindexmax.value;
@@ -91,6 +91,9 @@ function saveConfig () {
       }
       if (form.zones[prefix+'pause'].value) {
          newconfig.zones[i].pause = form.zones[prefix+'pause'].value;
+      }
+      if (form.zones[prefix+'master'].value) {
+         newconfig.zones[i].master = form.zones[prefix+'master'].value;
       }
       if (form.zones[prefix+'manual'].checked) {
          newconfig.zones[i].manual = true;
@@ -196,6 +199,19 @@ function showInput (name, content) {
    }
 }
 
+function showSelected (name, content) {
+   var elements = document.getElementsByName (name);
+   for (var i = 0; i < elements.length; i++) {
+      var element = elements[i];
+      for (var j = 0; j < element.options.length; j++) {
+         if (element.options[j].value == content) {
+            element.options[j].selected = true;
+            break;
+         }
+      }
+   }
+}
+
 function showCheckbox (name, content) {
    var elements = document.getElementsByName (name);
    for (var i = 0; i < elements.length; i++) {
@@ -292,6 +308,16 @@ function showOneZone (zones, i, elements) {
       pauseinput.placeholder = 'Seconds';
       pausecolumn.appendChild(pauseinput);
       outer.appendChild(pausecolumn);
+
+      var mastercolumn = document.createElement("td");
+      var masterinput = document.createElement("input");
+      masterinput.type = 'text';
+      masterinput.name = prefix+'master';
+      if (zones[i].master)
+         masterinput.value = zones[i].master;
+      masterinput.placeholder = 'Index';
+      mastercolumn.appendChild(masterinput);
+      outer.appendChild(mastercolumn);
 
       var manualcolumn = document.createElement("td");
       var manualinput = document.createElement("input");
@@ -818,6 +844,9 @@ window.onload = function() {
          titlecolumn.innerHTML = 'Pause';
          titleline.appendChild(titlecolumn);
          titlecolumn = document.createElement("th");
+         titlecolumn.innerHTML = 'Master';
+         titleline.appendChild(titlecolumn);
+         titlecolumn = document.createElement("th");
          titlecolumn.innerHTML = 'Manual';
          titleline.appendChild(titlecolumn);
 
@@ -930,9 +959,10 @@ window.onload = function() {
          if (config.wateringindex) {
             showCheckbox ("waterindexenable", config.wateringindex.enable);
             if (config.wateringindex.provider) {
-               showInput ("waterindexprov", config.wateringindex.provider);
+               showSelected ("waterindexprovider",
+                             config.wateringindex.provider);
             } else {
-               showInput ("waterindexprov", 'waterdex');
+               showSelected ("waterindexprovider", 'waterdex');
             }
             if (config.wateringindex.adjust) {
                showInput ("waterindexmin", config.wateringindex.adjust.min);
@@ -1149,7 +1179,12 @@ window.onload = function() {
         </tr>
         <tr>
            <td>Provider:</td>
-           <td><input type="text" size="16" name="waterindexprov" placeholder="Name"></td>
+           <td>
+              <select name="waterindexprovider">
+                 <option value="waterdex" selected>Waterdex.com</option> 
+                 <option value="mwdsocal">Metropolitan Water District of Southern California</option>
+              </select>
+           </td>
         </tr>
         <tr>
            <td style="vertical-align:top">Refresh times:</td>

@@ -72,6 +72,7 @@ function resetCounts() {
 
 function activateConfig () {
 
+    debugLog ('activating new configuration');
     event.configure(config, options);
     hardware.configure (hardwareConfig, config, options);
     hardware.rainInterrupt (rainCallback);
@@ -83,7 +84,7 @@ function activateConfig () {
     resetCounts();
 }
 
-function saveConfig (body) {
+function saveConfig (body, activate) {
 
     var data = JSON.stringify(body);
 
@@ -94,6 +95,9 @@ function saveConfig (body) {
         }
         debugLog('Configuration saved successfully.');
         config = body;
+        if (activate) {
+           activateConfig();
+        }
     });
 }
 
@@ -163,8 +167,7 @@ app.get('/config', function(req, res){
 
 app.post('/config', function(req, res){
     //debugLog(req.body);
-    saveConfig (req.body);
-    activateConfig();
+    saveConfig (req.body, true);
     res.json({status:'ok',msg:'config saved'});
 });
 
@@ -377,7 +380,7 @@ app.get('/zone/:id/history', function(req, res){
 
 app.get('/zone/:id/on/:seconds', function(req, res){
     if(req.params.id>=0 && req.params.id<zonecount){
-        zoneOn(req.params.id,req.params.seconds);
+        zoneOnManual(req.params.id,req.params.seconds);
         res.json({status:'ok',hostname:os.hostname(),msg:'started zone: '+config.zones[req.params.id].name});    
     }
     else {
@@ -593,7 +596,7 @@ setInterval(function(){
 
 // Add the listener for periodic information refresh.
 //
-// This does not need to be fast (here: 10mn), but each refresh function
+// This does not need to be fast (here: 1mn), but each refresh function
 // called is free to do nothing until a longer delay has expired.
 //
 setInterval(function(){
@@ -664,7 +667,7 @@ function clearTimers() {
     }
 }
 
-function zoneOn(index,seconds) {
+function zoneOnManual(index,seconds) {
     killQueue();
     runqueue.push({zone:index,seconds:seconds,parent:null});
     processQueue();
@@ -835,6 +838,18 @@ function programOn(program) {
     processQueue();
 }
 
+// Control on or off the master valve of the specified zone (if any).
+//
+function zoneMaster (index, on) {
+    if (config.zones[index].master !== undefined) {
+       var master = config.zones[index].master;
+       if ((master >= 0) && (master < zonecount)) {
+          hardware.setZone (master, on);
+          hardware.apply();
+       }
+    }
+}
+
 // Shut down all the zones and stop the current action.
 //
 function zonesOff() {
@@ -899,8 +914,11 @@ function processQueue() {
 
         running.remaining = running.seconds;
 
+        // Make sure that the zone does not open after its master (to avoid
+        // risks of backflow).
         hardware.setZone (running.zone, true);
         hardware.apply();
+        zoneMaster (running.zone, true);
 
         // clear any timers that are currently running
         clearTimers();
@@ -915,6 +933,9 @@ function processQueue() {
 
         // start a countdown timer for the zone watering time
         zoneTimer = setTimeout(function(){
+            // Make sure that the master does not close after the zone (to 
+            // avoid risks of backflow).
+            zoneMaster (running.zone, false);
             hardware.setZone (running.zone, false);
             hardware.apply();
 
@@ -962,7 +983,7 @@ function buttonCallback(x) {
             buttonTimer = setTimeout (function () {
                 var zone = currOn - 1;
                 debugLog('Turning on zone '+zone);
-                zoneOn(zone,900);
+                zoneOnManual(zone,900);
             }, 2000);
         }
         else {
