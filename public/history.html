@@ -104,6 +104,9 @@ window.onload = function() {
                   item = showZone(config.zones, event);
                   description = 'AFTER '+sprinklerShowDuration(event.runtime);
                   description += ', '+showParent(event);
+               } else {
+                  item = 'SYSTEM';
+                  description = 'COMPLETE SYSTEM RESET';
                }
                break;
             case 'SKIP':

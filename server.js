@@ -134,6 +134,20 @@ if (!config.wateringindex) {
     config.wateringindex.enable = false;
 }
 
+// Now that the configuration is available, quickly declare
+// a system exception catch-all, so that we can set all zones off
+// before the software exits.
+//
+process.on('uncaughtException', function(err) {
+    errorLog('Caught exception: ' + err.stack);
+    zonesOff()
+    event.record({action: 'END'});
+    setTimeout(function(){process.exit(1)}, 1000);
+});
+
+// For testing purpose only, do not uncomment otherwise!
+//
+//setTimeout(function(){ thisdoesnotexist(); }, 3000);
 
 ///////////////////////////////////////
 // CONFIGURE THE WEBSERVER
