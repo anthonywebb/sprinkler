@@ -83,7 +83,7 @@ do_stop()
 	RETVAL="$?"
 
 	# Reset all zones now, no matter what.
-	$DAEMON $RESET_ARGS 2>>/var/lib/sprinkler/errors >>/var/lib/sprinkler/stdout
+	(cd /var/lib/sprinkler ; $DAEMON $RESET_ARGS 2>>/var/lib/sprinkler/errors >>/var/lib/sprinkler/stdout)
 
 	[ "$RETVAL" = 2 ] && return 2
 	# Many daemons don't delete their pidfiles when they exit.
