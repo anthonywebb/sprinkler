@@ -16,7 +16,6 @@ var fs = require('graceful-fs');
 var moment = require('moment-timezone');
 
 var path = require('./path');
-var event = require('./event');
 var hardware = require('./hardware');
 
 
@@ -66,7 +65,6 @@ function resetCounts() {
 function activateConfig () {
 
     debugLog ('activating new configuration');
-    event.configure(config, options);
     hardware.configure (hardwareConfig, config, options);
     // Calculate the real counts from the configuration we loaded.
     resetCounts();
@@ -77,7 +75,7 @@ try {
     hardwareConfig = JSON.parse(hardwareConfig);
 }
 catch (err) {
-    errorLog('There has been an error loading or parsing the hardware config: '+err)
+    errorLog('There has been an error loading or parsing the hardware config: '+err.stack);
 } 
 
 var config = fs.readFileSync(path.userConfig());
@@ -88,7 +86,7 @@ try {
     activateConfig();
 }
 catch (err) {
-    errorLog('There has been an error parsing the user config: '+err)
+    errorLog('There has been an error parsing the user config: '+err.stack);
 } 
 
 ///////////////////////////////////////
@@ -97,13 +95,11 @@ catch (err) {
 
 // Shut down all the zones.
 //
-event.record({action: 'CANCEL'});
-
 for(var i = 0; i < zonecount; i++){
     hardware.setZone (i, false);
 }
 hardware.apply();
 
-// Give the event module time to flush out the cancel event item.
+// Give the program some time to flush out any pending action.
 setTimeout(function(){process.exit(1)}, 1000);
 
