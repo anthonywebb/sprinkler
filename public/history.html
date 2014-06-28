@@ -66,7 +66,7 @@ window.onload = function() {
       return description;
    }
 
-   function updateHistory(config) {
+   function updateHistory(zones) {
 
       sprinklerHistory (function (history) {
 
@@ -89,7 +89,7 @@ window.onload = function() {
                   item = 'PROGRAM '+event.program;
                   description = weatherInfo (event, 'WEATHER');
                } else if (event.zone != null) {
-                  item = showZone(config.zones, event);
+                  item = showZone(zones, event);
                   description = 'FOR '+sprinklerShowDuration(event.seconds);
                   description += ', '+showParent(event);
                   description += ', '+showAdjustment(event);
@@ -101,7 +101,7 @@ window.onload = function() {
                if (event.program != null) {
                   item = 'PROGRAM '+event.program;
                } else if (event.zone != null) {
-                  item = showZone(config.zones, event);
+                  item = showZone(zones, event);
                   description = 'AFTER '+sprinklerShowDuration(event.runtime);
                   description += ', '+showParent(event);
                } else {
@@ -111,7 +111,7 @@ window.onload = function() {
                break;
             case 'SKIP':
                action = 'SKIP';
-               item = showZone(config.zones, event);
+               item = showZone(zones, event);
                description = showParent(event);
                break;
             case 'STARTUP':
@@ -143,19 +143,19 @@ window.onload = function() {
       });
    }
 
-   function checkHistory (config) {
+   function checkHistory (zones) {
       sprinklerLatestEvent (function (event) {
          if ((lastEventId == null) || (lastEventId != event._id)) {
-            updateHistory (config);
+            updateHistory (zones);
          }
       });
    }
 
    sprinklerUpdate();
 
-   sprinklerConfig (function (config) {
-      updateHistory(config);
-      setInterval (function() {checkHistory(config)}, 1000);
+   sprinklerConfigZones (function (zones) {
+      updateHistory(zones);
+      setInterval (function() {checkHistory(zones)}, 1000);
    });
 }
 </script>

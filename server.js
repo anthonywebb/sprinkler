@@ -179,6 +179,10 @@ app.get('/config', function(req, res){
     res.json(config);
 });
 
+app.get('/config/zones', function(req, res){
+    res.json(config.zones);
+});
+
 app.post('/config', function(req, res){
     //debugLog(req.body);
     saveConfig (req.body, true);

@@ -37,6 +37,10 @@
 //
 //      This function retrieves the user configuration.
 //
+//   sprinklerConfigZones(callback);
+//
+//      This function retrieves the watering zones configuration.
+//
 //   sprinklerSaveConfig(config);
 //
 //      This function sends the user configuration to the server. The
@@ -199,6 +203,19 @@ function sprinklerInfo () {
 function sprinklerConfig (callback) {
    var command = new XMLHttpRequest();
    command.open("GET", "/config");
+   command.onreadystatechange = function () {
+      if (command.readyState === 4 && command.status === 200) {
+         var config = JSON.parse(command.responseText);
+         // var type = command.getResponseHeader("Content-Type");
+         callback(config);
+      }
+   }
+   command.send(null);
+}
+
+function sprinklerConfigZones(callback) {
+   var command = new XMLHttpRequest();
+   command.open("GET", "/config/zones");
    command.onreadystatechange = function () {
       if (command.readyState === 4 && command.status === 200) {
          var config = JSON.parse(command.responseText);
