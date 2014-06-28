@@ -28,6 +28,10 @@ var errorLog = function (text) {
     console.log ('[ERROR] '+text);
 }
 
+var infoLog = function (text) {
+    console.log ('[INFO] '+text);
+}
+
 var options = new Object();
 
 process.argv.forEach(function(val, index, array) {
@@ -43,7 +47,7 @@ if (options.debug) {
         console.log ('[DEBUG] '+moment().format('YYYY/MM/DD HH:mm')+' '+text);
     }
 }
-debugLog ('system reset (all zones)');
+infoLog ('system reset (all zones)');
 
 ///////////////////////////////////////
 // LOAD THE PROGRAM CONFIGURATION
@@ -99,4 +103,7 @@ for(var i = 0; i < zonecount; i++){
     hardware.setZone (i, false);
 }
 hardware.apply();
+
+// Give the event module time to flush out the cancel event item.
+setTimeout(function(){process.exit(1)}, 1000);
 
