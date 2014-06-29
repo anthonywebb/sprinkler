@@ -139,6 +139,10 @@ function verboseLog (text) {
    console.log ('[DEBUG] Weather: '+text);
 }
 
+function errorLog (text) {
+   console.log ('[ERROR] Weather: '+text);
+}
+
 function restoreDefaults () {
 
    url = null;
@@ -277,15 +281,22 @@ function getWeatherNow () {
          received = received + d.toString();
       });
       res.on('end', function(d) {
-         weatherConditions = JSON.parse(received);
+         var newreport = JSON.parse(received);
+         if ((newreport.history === undefined) ||
+             (newreport.history.dailysummary === undefined) ||
+             (newreport.current_observation === undefined)) {
+            errorLog ('invalid response from '+url+': '+received);
+         } else {
+            weatherConditions = newreport;
+            weatherConditions.updated = new Date();
+            debugLog ('received update');
+         }
          received = null;
-         weatherConditions.updated = new Date();
-         debugLog ('received update');
       });
    });
    webRequest.on('error', function(e) {
       received = null;
-      weatherConditions = null;
+      errorLog ('error response from '+url+': '+e);
    });
    webRequest.end();
    webRequest = null;
