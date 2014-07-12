@@ -1,0 +1,42 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<link rel=stylesheet type="text/css"
+      href="/sprinkler.css" title="Sprinkler">
+<script src="/sprinklerlib.js"></script>
+<script>
+window.onload = function() {
+
+   sprinklerInfo();
+}
+</script>
+<title></title>
+</head>
+<body>
+   <div class="sprkrpanel">
+   <div class="sprkrpane">
+   <table class="sprkrstatus">
+   <tr><td colspan="2"><span class="sprkrtitle">Weather</span></td></tr>
+   <tr><td>Updated:</td>
+   <td><span class="sprkrdata weatherupdated"></span></td></tr>
+   <tr><td>Temperature:</td>
+   <td><span class="sprkrdata temperature"></span> (<span class="sprkrdata maxtemp"></span> / <span class="sprkrdata mintemp"></span>)</td></tr>
+   <tr><td>Wind:</td>
+   <td><span class="sprkrdata windspeed"></span> <span class="sprkrdata winddirection"></span></td></tr>
+   <tr><td>Pressure:</td>
+   <td><span class="sprkrdata pressure"></span></td></tr>
+   <tr><td>Humidity:</td>
+   <td><span class="sprkrdata humidity"></span></td></tr>
+   <tr><td>Dew Point:</td>
+   <td><span class="sprkrdata dewpoint"></span></td></tr>
+   <tr><td>Rain:</td>
+   <td><span class="sprkrdata rain"></span> (<span class="sprkrdata rainsensor"></span>)</td></tr>
+   <tr><td>Watering Index:</td>
+   <td><span class="sprkrdata adjustment"></span></td></tr>
+   </table>
+   </div>
+   <br>
+   </div>
+</body>
+</html>
+

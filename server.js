@@ -417,7 +417,20 @@ app.get('/calendar/programs', function(req, res){
 
 app.get('/weather', function(req, res){
     if (weather.status()) {
-        res.json({status:'ok',hostname:os.hostname(),temperature:weather.temperature(),high:weather.high(),low:weather.low(),humidity:weather.humidity(),rain:weather.rain(),rainsensor:weather.rainsensor(),adjustment:weather.adjustment()});
+        res.json({
+           status:'ok',
+           hostname:os.hostname(),
+           temperature:weather.temperature(),
+           high:weather.high(),
+           low:weather.low(),
+           humidity:weather.humidity(),
+           rain:weather.rain(),
+           rainsensor:weather.rainsensor(),
+           windspeed:weather.windspeed(),
+           winddirection:weather.winddirection(),
+           pressure:weather.pressure(),
+           dewpoint:weather.dewpoint(),
+           adjustment:weather.adjustment()});
     } else {
         res.json({status:'ok'});    
     }
@@ -623,7 +636,7 @@ setInterval(function(){
     wateringindex.refresh();
     var update = weather.updated();
     if (weather.status() && (update > lastWeatherUpdateRecorded)) {
-        event.record({action: 'UPDATE', source:'WEATHER', temperature: weather.temperature(), humidity: weather.humidity(), rain: weather.rain(), adjustment: weather.adjustment()});
+        event.record({action: 'UPDATE', source:'WEATHER', temperature: weather.temperature(), windspeed: weather.windspeed(), humidity: weather.humidity(), rain: weather.rain(), adjustment: weather.adjustment()});
         lastWeatherUpdateRecorded = update;
     }
     update = wateringindex.updated();
@@ -847,6 +860,7 @@ function programOn(program) {
         logentry.source = wateringindex.source();
     } else if (weather.status()) {
         logentry.temperature = weather.temperature();
+        logentry.windspeed = weather.windspeed();
         logentry.humidity = weather.humidity();
         logentry.rain = weather.rain();
         logentry.adjustment = weather.adjustment();

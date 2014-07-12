@@ -168,7 +168,11 @@ function sprinklerUpdate () {
                sprinklerSetContent ('temperature', ''+response.temperature+' F');
                sprinklerSetContent ('maxtemp', ''+response.high+' F');
                sprinklerSetContent ('mintemp', ''+response.low+' F');
+               sprinklerSetContent ('pressure', ''+response.pressure+' in');
+               sprinklerSetContent ('windspeed', ''+response.windspeed+' mph');
+               sprinklerSetContent ('winddirection', response.winddirection);
                sprinklerSetContent ('humidity', ''+response.humidity+'%');
+               sprinklerSetContent ('dewpoint', ''+response.dewpoint+' F');
                sprinklerSetContent ('rain', ''+response.rain+' in');
                sprinklerSetContent ('rainsensor', response.rainsensor?'SENSOR ON':'SENSOR OFF');
             }
