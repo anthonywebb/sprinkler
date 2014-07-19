@@ -458,10 +458,14 @@ function iCalendarToProgram (calendar_name, event) {
       if (event.rrule.until != undefined) {
          var until = dateToMoment({time:event.rrule.until,tzid:event.start.tzid}, event.timezone);
          if (now.diff(until) >= 60000) { // Up to a minute leeway.
-            infoLog ('ignoring recurring event '+program.name+' (expired)');
+            infoLog ('ignoring recurring event '+program.name+' (starts at '+start.format('MM/DD/YYYY HH:mm')+', expired at '+until.format('MM/DD/YYYY HH:mm')+')');
             return null;
          }
          program.until = until;
+         program.name = event.summary+' (until '+until.format('MM/DD/YYYY')+')@'+calendar_name;
+         infoLog ('recurring event '+event.summary+' starts at '+start.format('MM/DD/YYYY HH:mm')+', expires at '+until.format('MM/DD/YYYY HH:mm')+')');
+      } else {
+         infoLog ('recurring event '+event.summary+' starts at '+start.format('MM/DD/YYYY HH:mm')+', no expiration');
       }
       // Set the time of day, interval and day filter.
       switch (event.rrule.freq) {
@@ -488,7 +492,7 @@ function iCalendarToProgram (calendar_name, event) {
          break;
 
       default:
-         errorLog ('ignoring recurring event '+program.name+' (unsupported frequence '+event.rrule.freq+')');
+         errorLog ('ignoring recurring event '+event.summary+' (unsupported frequence '+event.rrule.freq+')');
          program = null;
          return null;
       }
@@ -520,7 +524,7 @@ function iCalendarToProgram (calendar_name, event) {
 
    } else {
       if (now.diff(start) >= 60000) { // Up to a minute leeway.
-         infoLog ('ignoring single event '+program.name+' (expired)');
+         infoLog ('ignoring single event '+event.summary+' (expired)');
          return null;
       }
    }
@@ -537,11 +541,11 @@ function iCalendarToProgram (calendar_name, event) {
    program.options = descriptionToOptions (event.description);
 
    if (! program.zones) {
-      errorLog('ignoring  event '+program.name+' (unsupported zone name)');
+      errorLog('ignoring  event '+event.summary+' (unsupported zone name)');
       return null;
    }
 
-   infoLog ('importing event '+program.name+' at '+program.start+' starting on '+program.date);
+   infoLog ('importing program '+program.name+' at '+program.start+' starting on '+program.date);
    return program;
 }
 
@@ -641,7 +645,7 @@ ICalendar.prototype.import = function (text) {
          }
          var is_new_program = true;
          for (var j = 0; j < imported.programs.length; j++) {
-            if (imported.programs[j].name == program.name) {
+            if (imported.programs[j].uid == program.uid) {
                imported.programs[j] = program;
                is_new_program = false;
                break;

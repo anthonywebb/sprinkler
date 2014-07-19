@@ -455,12 +455,14 @@ function scheduleOneProgram (program, now) {
    if (program.until) {
       if (program.until.isBefore(now)) return false;
    }
+   debugLog ('Exact time of day for program '+program.name);
 
    // Eliminate occurrences that have been excluded (either modified and
    // replaced by an exception, or deleted).
    if (program.exclusions) {
       for (var j = 0; j < program.exclusions.length; j++) {
          if (Math.abs(now.diff(program.exclusions[j])) < 60000) {
+            debugLog ('Program '+program.name+' is excluded today');
             return false; // This occurrence was excluded.
          }
       }
@@ -470,8 +472,8 @@ function scheduleOneProgram (program, now) {
    if (program.date) {
       var date = moment(program.date+' '+program.start, 'YYYYMMDD HH:mm');
       var delta = now.diff(date, 'days');
-      if (delta < 0) return false; // Starts at a future date.
       debugLog ('delta from '+date.format()+' to '+now.format()+' is '+delta);
+      if (delta < 0) return false; // Starts at a future date.
    } else {
       // No start date yet: force the program to start today.
       program.date = now.format('YYYYMMDD');
