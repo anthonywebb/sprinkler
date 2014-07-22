@@ -148,7 +148,6 @@ var refreshSchedule = new Array();;
 var url = null;
 var enable = false;
 var raintrigger = null;
-var webRequest = null;
 
 var adjustParameters = new Object();
 
@@ -302,12 +301,24 @@ function getWeatherNow () {
    debugLog ('checking for update..');
    received = "";
 
-   webRequest = http.request(url, function(res) {
+   var webRequest = http.request(url, function(res) {
       res.on('data', function(d) {
          received = received + d.toString();
       });
       res.on('end', function(d) {
-         var newreport = JSON.parse(received);
+         var newreport = null;
+         try {
+            newreport = JSON.parse(received);
+         }
+         catch (err) {
+            if (received.search (/<TITLE>Service Unavailable<\/TITLE>/) > 0) {
+               errorLog('service unavailable');
+            } else {
+               errorLog('received invalid data = '+received);
+            }
+            received = null;
+            return;
+         }
          if ((newreport.history === undefined) ||
              (newreport.history.dailysummary === undefined) ||
              (newreport.current_observation === undefined)) {
