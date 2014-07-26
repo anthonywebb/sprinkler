@@ -1,0 +1,183 @@
+\documentclass[11pt]{book}
+\title{\textbf{The Sprinkler System Manual}}
+\author{Pascal Martin}
+\begin{document}
+\frontmatter
+\chapter{Preface}
+This sprinkler software was born out of frustration. I was looking for a sprinkler controller that is internet accessible with a web interface (allowing access from a desktop, laptop tablet and phone), generates extensive logs recording its activity, support an unlimited number of programs (to tailor watering schedule to each zone), no restriction on the number of master valve. In general it shall have none of these arbitrary limitations inherited from 8 bit microcontrollers. It must be fully automatic and self-adjusting to the current weather.
+
+The existing commercial equipments ended up being expensive professional systems or a handful of products by small vendors that are usually saddled by the same frustrating limitations of their 8 bit ancestors: limited number of programs and single master valve. The search also returned a few Open Source solutions, from the elegantly minimal (crontab jobs) to the fully integrated hardware and software. None of them combined all the features that I was looking for..
+
+I stumbled upon a Google+ entry for a sprinkler system being developped, based on the BeagleBone Black board. It was Open Source, supported unlimited programs and provided an event log. Most of all, being just started, it was small and written in JavaScript using Node.js (a modern environment and a good learning opportunity), and there was a Web API. I started extending it to fullfill my wish list: configure watering program using Google Calendar, interface to WeatherUnderground, etc. Because the BeagleBone Black was not available for two months when I wanted it, and because the triac board for which it was written was not yet available, I switched to Raspberry Pi and a cheap relay board and I redesigned the software to becomes more portable. This book describes the software that resulted from this effort.
+
+It is my belief that the difference between personnal hack and usable software is documentation. One that it not comprehensible only to its developers. This is what this book is about.
+
+The goal of this book is to be a complete manual for the Sprinkler software. It tends to three different audiences: the regular user, who wants to know how to install and use the software, the hobbyist, who wants advices and guidelines on how to assemble some hardware compatible with the existing software, and the developper, who want to extend the software or port to a new kind of hardware.
+
+The hope is that this book will make it possible for others to assemble their own system in a matter of a few days and enjoy the pride of using a system you made yourself.
+
+The Sprinkler software was not born out of a vacuum. It was brilliantly started by Anthony Webb. I also benefited from hardware and software advices by Pascal Mermoz, who's software I will never use since I like neither Python or Apple. Last, but not least, it benefits from the excellent Node.js environment. Even while it is amazing that it takes more than 30 MB of RAM nowadays to control just 8 zones, Node.js is completely worth it.
+
+\mainmatter
+\chapter{Overview}
+\section{About this Book}
+This book is not your usual sprinkler controller's user manual. When you are using the Sprinkler software, you are putting together a custom controller equipment. You must expect having to tinker with cabling, software installation, etc.
+
+The intend of this book is to help you put together the hardware, install and configure the software and then (and only then) configure your watering schedule. The sequence of chapters that follows reflect this process.
+
+It is assumed that the reader is comfortable with  installation and configuration of a Linux system and knows some Node.js basics  (including the npm tool). Knowledge of JavaScript programming is not required, but this is probably going to help.
+
+\section{Features}
+The Sprinkler software support the following features:
+\begin{itemize}
+\item An unlimited number of independent watering programs.
+\item Each watering program can be started on specific days of the week or day interval, and at a specific time of day.
+\item Watering programs can be configured locally, or from a list of source calendars. This was tested with Google Calendar, but any URL-based interface using the VCALENDAR format should work.
+\item Support for calendar edits: modify programs starting at a given date, modify or delete a single occurrence only (i.e. one day exception).
+\item Automatically fetch weather information through the WeatherUnderground web site.
+\item Automatic watering index updates from either Waterdex.com,  the Metropolitan Water District of Souther California (if you are in the Los Angeles area), or computed from the weather information.
+\item Support for fixed sets of monthly watering index as an alternative to Internet updates. Each zone may use its own monthly watering index set (this can be useful if the soil or shade characteristics are very different between zones).
+\item Optional generation of pulse and pause to avoid water puddling or running off. The length of each watering pulse and the subsequent pause is configurable zone by zone. Just create programs with the total watering time, and the software will generate all necessary pulse sequences. No more fiddling with multiple start times.
+\item seasonal programming: define seasons month by month or week by week and have specific program activated only during the specified season.
+\item Allow to block programs from activation a specific watering zone; manual activation remains possible. This is useful when a pipe broke and no watering should occur until it has been repaired.
+\item Each zone can be named. The name appears in the event log.
+\item support for multiple master valves. A specific master valve may be specified zone by zone. A master valve may itself have a master too: cascade of master valves is supported. This makes it possible to use a water pump to feed a master valve that feeds zones. The sprinkler software will follow the chain of master dependencies, with no arbitrary limit. Any zone, and any number of zones, can be used as master.
+\item Standard-compliant web interface, made dynamic through JavaScript.
+\item Web interface style defined through a separate CSS file.
+\item Event log, accessible through the Web, with current weather and adjustment information. The event log is saved to permanent storage and is automatically restored on restart.
+\item Event forwarding through the syslog interface.
+\item Manual activation of each zone, or each program, through the Web interface.
+\item Automatic start at boot time (System V start script).
+\end{itemize}
+\chapter{The Controller Equipment}
+\section{Software Environment}
+The Sprinkler software is designed for the node.js environment. This in turn mandates the Linux Operating system. The Debian distribution is highly recommended (in fact, the init script available with the Sprinkler software is designed for the Debian environment and may not work in non-Debian distributions).
+
+There is no need for any graphic desktop or environment. The whole system can probably run on 128 MB of RAM.
+\section{Computer Hardware}
+The typical computer equipment will be a small ARM-based board, such as the BeagleBone or Raspberry Pi.
+
+However, any computer environment supported by node.js can be used. The other constraint is that the computer board must provide General Purpose I/O pins that are supported by the Linux gpio subsystem. This includes the Intel Minnowboard Max and Galileo boards.
+
+Note that the Sprinkler software does \emph{not} include support for USB I/O boards. These often implement variants of the USB's HID standard: a specific driver would need to be developped.
+\section{Sprinkler Hardware Interface}
+An hardware interface for controlling the valves' solenoids is necessary. There are a few different types:
+\begin{itemize}
+\item Triac boards that are specifically designed for that very purpose, and are typically designed to fit one computer board model. These triacs require AC power for the solenoid (they cannot trigger on DC current), typically 24 Volt. The best example available is the OpenSprinkler boards for the BeagleBone Black and the Raspberry Pi. The Sprinkler software includes support for both.
+\item Relay boards are usually designed for broad usage (such as controlling 110 or 220 Volts electrical equipment) but are a good fit for solenoid control. The downsides are that you have to do the wriring yourself, and the relays are noisy. The Sprinkler software includes support for a vendor-neutral and generic relay interface that is highly configurable. A typical example of relay board is the SainSmart 5V 4 or 8 relay boards, or their multiple clones.
+\item There are some special relay boards that are BeagleBone Black capes, Raspberry Pi modules or Arduino Shield. The frequent downside of such boards, beside their higher price, is that the number of relays is low because of the limitated room available.
+\item The Sprinkler software also supports its original target board, a 16 zone cape for the BeagleBone Black. It is unclear at this time if the board will be commercially available. If you can get your hand on one, this should be an easy path to 16 zones heaven.
+\end{itemize}
+Do not use the commonly available Solid State Relay (SSR) boards, typically based on the Omron modules, as these only trigger \emph{above} 75 Volts AC. Since a valve's solenoid is designed for 24 Volts, the SSR will not trigger.
+\section{Using a Generic Relay Board}
+A generic 5 Volt relay board is typically what hobbyists use, due to their low cost and flexibility. In fact, a relay board should be considered a mandatory part of any hobbyist toolkit.
+
+Using such a relay board necessitates some assembly: you have to do the wiring yourself. There are three sides to this wiring job:
+\begin{itemize}
+\item On the computer side, you want to connect the computer's General Purpose Input/Output (GPIO) pins to the input pins of the relay board. It is typically OK to connect 3.3 Volt GPIO pins to a 5 Volt input: the trigger levels are usually compatible.
+\item The relay board also necessitates a 5 Volt power supply. A 8 relays board typically draws up to 400-500 mA when all 8 relays are closed (worst case), so the board can be powered from the computer if your power supply has some room.
+\item Last the wiring on the solenoid side requires some attention, as a sprinkler wiring and the standard relay wiring are not organized the same way.
+\end{itemize}
+\subsection{Computer Wires}
+Because no pre-made wire is typically delivered with the board, a hobbyist has two solutions on the computer side:
+\begin{itemize}
+\item Create his own wires. It is recommended not to solder directly on the computer and relay board pins. Use a connector suited to each board. This facilitate assembly, manipulation and later maintenance. It also avoids killing the computer board with heat too high for its fragile components.
+\item Buy pre-oldered individual wires. That's the easy route: these wires can be bought by sets of 10 at RadioShack, or by sets of 40 to 100 on Amazon. They usually fit the usual double row of single row pins used on the computer and relay boards. You will have to determine which set matches your equipment \emph{before} you buy: female-female, male-male or female-male.
+\end{itemize}
+\subsection{5 Volt Power Wires}
+The same type of wire is typically OK on the 5 Volt power supply side. Many relay boards have two 5 Volt pins: one pin powers opto-couplers (for electrical protection), the other powers the relay coils themselves. Connect the second one to a separate 5 Volt power supply if you need a high level protection against high voltage, or if the computer board's power supply is not up to the task. Otherwise, just use two wires between the computer board and the 5 Volt power pins: this will slightly reduce the maximum current that circulates on each wire.
+\subsection{Solenoid Wires}
+On the solenoid wiring side, a relay typically provides 3 connections: a common (COM), a normally open (NO) and a normally closed (NC). The sprinkler wire has one common wire shared by all solenoids and one power wire for each. The sprinkler power wires should be attached to the normally open connections, one side of the 24 Volt AC power should be connected to each relay's common connection, and the other 24 Vold AC side should be connected to the sprinkler common wire (the sprinkler common wire should \emph{not} be connected to the relays).
+
+\chapter{Installing the Software}
+\section{Dependencies}
+\subsection{General}
+The Spinkler software depends on the following software:
+\begin{description}
+\item[Node.js, version 0.10.2 or higher] \emph{Required}. The npm tool is required as well, as it is needed to install the node modules dependencies. Versions 0.9 or less of Node.js will not work, because these are no longer able to install required modules like express.
+\item[git] \emph{Required}. As the Sprinkler software currently stands, git is the current installation method described in this document. This will be improved some day.
+\item[express] \emph{Required}. Installed through npm. This module provide a complete library for rapid web server development.
+\item[graceful-fs] \emph{Required}. Installed through npm. This module is a replacement for the standard Node.js fs module (file system access), used to avoid memory leaks in fs.
+\item[moment-timezone] \emph{Required}. Installed through npm. This module is an extension to the JavaScript Date object, with many more powerful features and explicit timezone support.
+\item[nedb] \emph{Required}. Installed through npm. This module implements a small, MongoDB-like, database library, which is used to store events.
+\item[onoff] \emph{Essential}. Installed through npm. Must be installed on the Raspberry Pi, as an alternative to the BeagleBone Black's bonescript module. The plan is to migrate from bonescript to onoff, since onoff is a portable subset that is largely sufficient for the Sprinkler software.
+\item[node-syslog] \emph{Optional}. Installed through npm. Must be installed for events to be forwarded to syslog. 
+\end{description}
+\emph{The npm modules should be installed from the sprinkler directory, after the Sprinkler software itself was installed.}
+\subsection{Raspberry Pi Specific Dependencies}
+The Spinkler software depends on the following software specific to the Raspberry Pi:
+\begin{description}
+\item[Raspbian] \emph{Required}. The Sprinkler software was developped and tested with, and for, Raspbian. However, the version of Node.js available on Raspbian is too old and not usable: it should not be installed. See below for an alternative.
+\item[Node.js] \emph{Required}. Install the latest version of Node.js that was built for Raspbian, available from nodejs.org: \texttt{http://nodejs.org/dist/}. The name of the file will be something like node-vX.Y.Z-linux-arm-pi.tar.gz. Be aware that not all versions are built for the Raspberry, so you will have to search, starting with the latest version down. Create directory /home/pi/Software and untar the archive under that directory (this will create a subdirectory specific to that version).
+\end{description}
+\subsection{BeagleBone Specific Dependencies}
+\begin{description}
+\item[Debian] \emph{Required}. Debian is now the default environment for the BeagleBone, so this dependency should not be a problem.
+\item[Node.js] \emph{Required}. Since the BeagleBone preferred programming environment is Node.js, the default version that comes with the system should be fine.
+\end{description}
+\section{Installing Sprinkler}
+The installation of Sprinkler is done using git, more specifically from the Sprinkler GitHub repository. Create a clone of the repository using the commands similar to the sequence below:
+
+\indent\texttt{git clone https://github.com/pascal-fb-martin/sprinkler.git}
+\linebreak
+\indent\texttt{cd sprinkler}
+\linebreak
+\indent\texttt{git checkout}
+\linebreak
+The next step is to select which interface board driver to use, depending on the hardware available:
+\begin{description}
+\item[hardware-relays.js] This is the driver for generic relay boards, very configurable. This works on the Raspberry Pi and BeacgleBone Black. This is also the driver I use.
+\item[hardware-osbo.js] This is the driver for the OpenSprinkler's OSBo board and is meant to be used on the BeacgleBone Black. Not tested with a real board, through.
+\item[hardware-ospi.js] This is the driver for the OpenSprinkler's OSPi board and is meant to be used on the Raspberry Pi. This is a work in progress for now.
+\item[hardware-beagle16.js] This is the driver for Anthony Webb's BeagleBone Black cape.
+\item[hardware-null.js] This is a null driver, to use when no interface board is available. Obviously, this is only for development and testing purpose. Do not use on your final configuration.
+\end{description}
+To configure the driver, simply create a symbolic link named \texttt{hardware.js}. For example:
+
+\indent\texttt{ln -s hardware-relays.js hardware.js}
+\linebreak
+The last steps is to install all necessary Node.js modules using the npm tool. This tool must be run from the same directory where the Sprinkler software was installed. The necessary modules are: express, graceful-fs,  moment-timezone,  nedb,  node-syslog and onoff.
+
+\subsection{Installing Sprinkler on the Raspberry Pi}
+This section provide some tips about setting up a rasberry Pi for Sprinkler. This is not intended as a complete step by step installation manual: some steps may vary depending on the version of Raspbian used, many standard Linux administration steps are omitted, etc. View the list below as tips, general advices:
+\begin{description}
+\item Remove unused software from the standard Raspbian image. They can take a lot of space, and you will be hit with having to update them regularly. A basic list: scratch, squeak-vm, wolfram-engine, oracle-java7-jdk, java-common.
+\item Update and upgrade your system after installation.
+\item Silence syslog for many Linux daemon (such as ntpd), because periodic logs cause the flash card to age prematurely. The standard way is to redirect "daemon.info;auth.debug" to \texttt{/dev/null}.
+\item Create a user account for the Sprinkler software, or else use the default pi account created by Raspbian. Do not run the Sprinkler software as user root.
+\item Install Node.js for the raspberry PI from the Node.js web site (go to \texttt{http://nodejs.org/dist/}). The lastest version of Node.js with which the sprinkler software was tested on the Raspberry Pi is 0.10.26, but try to use the most recent version that exists. Remember than module downloaded using npm will \emph{only} work if Node.js is recent \emph{enough}.
+\end{description}
+
+\section{Configuring Sprinkler}
+This section is not about setting your watering programs. We are not there yet. This is about creating the minimal environment necessary for the Sprinkler software to run.
+\begin{description}
+\item As root, create directory \texttt{/var/lib/sprinkler}. Give read/write/execute access to the Unix user that will run the Sprinkler software.
+\item Copy \texttt{config-template.json} to \texttt{/var/lib/sprinkler/config.json}. Edit the web port number, if the default (8080) does not suit you.
+\item Copy \texttt{hardware.json} to \texttt{/var/lib/sprinkler/hardware.json}. You may want to verify that the hardware configuration for your specific board matches your actual hardware, as this configuration cannot be edited through the web interface. Generic relay hardware does not use this configuration, but it is still necessary to copy the file.
+\item As root, copy \texttt{init-debian.sh} to \texttt{/etc/init.d/sprinkler}. Make the later executable. This script is compliant with the Linux Standard Base (LSB) comment conventions.
+\item As root, create the file \texttt{/etc/default/sprinkler}. This file is a shell script (bash) that must define a few environment variables:
+\begin{description}
+\item NODE\_JS\_HOME: the path of the directory where Node.js was installed. A typical path for a local installation is:
+
+\texttt{/home/pi/Software/node-v0.10.26-linux-arm-pi}.
+\item SPRINKLER\_USER: the Unix user account that the Sprinkler software will run under.
+\item SPRINKLER\_HOME: the path of the directory where the Sprinkler software was installed.
+\end{description}
+The Sprinkler init script comes with some defaults but, at a minimum, the NODE\_JS\_HOME environment variable must be defined: the actual default in the init script calls for a specific (non-standard) location and version.
+\item Enable the init script. On Debian this is done using the command \texttt{inssserv}.
+\end{description}
+\chapter{Using the System}
+\section{Navigating the Web Interface}
+\section{Defining Your Location}
+\section{Configuring Zones}
+\section{Scheduling Local Watering Programs}
+\section{Using Google Calendar}
+\section{Seasons and Watering Index}
+\section{Monitoring Sprinkler Activity}
+\section{Manual Control}
+\chapter{Tinkering with the Software}
+\section{How the Sprinkler software is Organized}
+\section{Sprinkler Hardware Interface}
+\section{Watering Index Provider}
+\backmatter
+\end{document}
