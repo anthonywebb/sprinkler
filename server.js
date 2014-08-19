@@ -1,8 +1,11 @@
 var os = require('os');
 var fs = require('graceful-fs');
 var dgram = require('dgram');
-var express = require('express');
 var moment = require('moment-timezone');
+
+var express = require('express');
+var bodyParser = require('body-parser');
+var staticpages = require('serve-static');
 
 var path = require('./path');
 var event = require('./event');
@@ -153,11 +156,8 @@ process.on('uncaughtException', function(err) {
 // CONFIGURE THE WEBSERVER
 //////////////////////////////////////
 var app = express();
-app.use(express.favicon());
-app.use(express.bodyParser());
-app.use(app.router);
-app.use(express.static(__dirname+'/public'));
-app.use(missingHandler);
+app.use(staticpages(__dirname+'/public'));
+app.use(bodyParser());
 
 // Routes
 
@@ -440,6 +440,15 @@ app.get('/hardware/info', function(req, res){
     res.json(hardware.info());
 });
 
+
+// End of chain: if the URL requested matches nothing, return an error.
+//
+app.use(function (req, res, next) {
+    errorLog('404 Not found - '+req.url);
+    res.json(404, { status: 'error', msg: 'Not found, sorry...' });
+});
+
+
 ///////////////////////////////////////
 // SCHEDULER
 //////////////////////////////////////
@@ -678,11 +687,6 @@ event.record({action: 'STARTUP'});
 ///////////////////////////////////////
 // HELPERS
 //////////////////////////////////////
-
-function missingHandler(req, res, next) {
-    errorLog('404 Not found - '+req.url);
-    res.json(404, { status: 'error', msg: 'Not found, sorry...' });
-}
 
 function errorHandler(res, msg) {
     errorLog(msg);
