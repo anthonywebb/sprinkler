@@ -64,9 +64,9 @@ Note that the Sprinkler software does \emph{not} include support for USB I/O boa
 An hardware interface for controlling the valves' solenoids is necessary. There are a few different types:
 \begin{itemize}
 \item Triac boards that are specifically designed for that very purpose, and are typically designed to fit one computer board model. These triacs require AC power for the solenoid (they cannot trigger on DC current), typically 24 Volt. The best example available is the OpenSprinkler boards for the BeagleBone Black and the Raspberry Pi. The Sprinkler software includes support for both.
-\item Relay boards are usually designed for broad usage (such as controlling 110 or 220 Volts electrical equipment) but are a good fit for solenoid control. The downsides are that you have to do the wriring yourself, and the relays are noisy. The Sprinkler software includes support for a vendor-neutral and generic relay interface that is highly configurable. A typical example of relay board is the SainSmart 5V 4 or 8 relay boards, or their multiple clones.
-\item There are some special relay boards that are BeagleBone Black capes, Raspberry Pi modules or Arduino Shield. The frequent downside of such boards, beside their higher price, is that the number of relays is low because of the limitated room available.
-\item The Sprinkler software also supports its original target board, a 16 zone cape for the BeagleBone Black. It is unclear at this time if the board will be commercially available. If you can get your hand on one, this should be an easy path to 16 zones heaven.
+\item Relay boards are usually designed for broad usage (such as controlling 110 or 220 Volts electrical equipment) but are a good fit for solenoid control. The downsides are that you have to do the wiring yourself, and the relays are noisy. The Sprinkler software includes support for a vendor-neutral and generic relay interface that is highly configurable. A typical example of relay board is the SainSmart 5V 4 or 8 relay boards, or their multiple clones.
+\item There are some special relay boards that are BeagleBone Black capes, Raspberry Pi modules or Arduino Shield. The frequent downside of such boards, beside their higher price, is that the number of relays is low because of the limited room available.
+\item The Sprinkler software also supports its original target board, a 16 zones cape for the BeagleBone Black. It is unclear at this time if the board will be commercially available. If you can get your hand on one, this should be an easy path to 16 zones heaven.
 \end{itemize}
 Do not use the commonly available Solid State Relay (SSR) boards, typically based on the Omron modules, as these only trigger \emph{above} 75 Volts AC. Since a valve's solenoid is designed for 24 Volts, the SSR will not trigger.
 \section{Using a Generic Relay Board}
@@ -96,7 +96,8 @@ The Spinkler software depends on the following software:
 \begin{description}
 \item[Node.js, version 0.10.2 or higher] \emph{Required}. The npm tool is required as well, as it is needed to install the node modules dependencies. Versions 0.9 or less of Node.js will not work, because these are no longer able to install required modules like express.
 \item[git] \emph{Required}. As the Sprinkler software currently stands, git is the current installation method described in this document. This will be improved some day.
-\item[express] \emph{Required}. Installed through npm. This module provide a complete library for rapid web server development.
+\item[express] \emph{Required}. Installed through npm. This module provide a complete library for rapid web server development. Express \emph{must} be version 4 (or higher, if compatible).
+\item[body-parse] \emph{Required}. Installed through npm. This module provide a plugin for Express that parses a http body.
 \item[graceful-fs] \emph{Required}. Installed through npm. This module is a replacement for the standard Node.js fs module (file system access), used to avoid memory leaks in fs.
 \item[moment-timezone] \emph{Required}. Installed through npm. This module is an extension to the JavaScript Date object, with many more powerful features and explicit timezone support.
 \item[nedb] \emph{Required}. Installed through npm. This module implements a small, MongoDB-like, database library, which is used to store events.
@@ -132,11 +133,16 @@ The next step is to select which interface board driver to use, depending on the
 \item[hardware-beagle16.js] This is the driver for Anthony Webb's BeagleBone Black cape.
 \item[hardware-null.js] This is a null driver, to use when no interface board is available. Obviously, this is only for development and testing purpose. Do not use on your final configuration.
 \end{description}
-To configure the driver, simply create a symbolic link named \texttt{hardware.js}. For example:
+To select a driver, simply create a symbolic link named \texttt{hardware.js}. For example:
 
 \indent\texttt{ln -s hardware-relays.js hardware.js}
 \linebreak
-The last steps is to install all necessary Node.js modules using the npm tool. This tool must be run from the same directory where the Sprinkler software was installed. The necessary modules are: express, graceful-fs,  moment-timezone,  nedb,  node-syslog and onoff.
+The last steps is to install all necessary Node.js modules using the npm tool. This tool must be run from the same directory where the Sprinkler software was installed. The typical list of necessary modules is: express, body-parse, graceful-fs,  moment-timezone,  nedb,  node-syslog and onoff. For example:
+
+\indent\texttt{npm install express body-parse graceful-fs}
+\linebreak
+\indent\texttt{npm install moment-timezone nedb node-syslog onoff}
+\linebreak
 
 \subsection{Installing Sprinkler on the Raspberry Pi}
 This section provide some tips about setting up a rasberry Pi for Sprinkler. This is not intended as a complete step by step installation manual: some steps may vary depending on the version of Raspbian used, many standard Linux administration steps are omitted, etc. View the list below as tips, general advices:
