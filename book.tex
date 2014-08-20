@@ -97,7 +97,8 @@ The Spinkler software depends on the following software:
 \item[Node.js, version 0.10.2 or higher] \emph{Required}. The npm tool is required as well, as it is needed to install the node modules dependencies. Versions 0.9 or less of Node.js will not work, because these are no longer able to install required modules like express.
 \item[git] \emph{Required}. As the Sprinkler software currently stands, git is the current installation method described in this document. This will be improved some day.
 \item[express] \emph{Required}. Installed through npm. This module provide a complete library for rapid web server development. Express \emph{can} be version 3 or 4 (or higher, if compatible).
-\item[body-parse] \emph{Required}. Installed through npm. This module provides a plugin for Express that parses a http body. (This module is integrated in express 3, but is a separate module starting with express 4. Using the separate module seems to work well with express 3 as well.)
+\item[body-parser] \emph{Required}. Installed through npm. This module provides a plugin for Express that parses a http body. (This module is integrated in express 3, but is a separate module starting with express 4. Using the separate module seems to work well with express 3 as well.)
+\item[serve-static] \emph{Required}. Installed through npm. This module provides a plugin for Express that serves static web pages. (This module is integrated in express, but also exists as a separate module starting with express 4. Using the separate module seems to work well with express 3 as well.)
 \item[graceful-fs] \emph{Required}. Installed through npm. This module is a replacement for the standard Node.js fs module (file system access), used to avoid memory leaks in fs.
 \item[moment-timezone] \emph{Required}. Installed through npm. This module is an extension to the JavaScript Date object, with many more powerful features and explicit timezone support.
 \item[nedb] \emph{Required}. Installed through npm. This module implements a small, MongoDB-like, database library, which is used to store events.
@@ -137,9 +138,9 @@ To select a driver, simply create a symbolic link named \texttt{hardware.js}. Fo
 
 \indent\texttt{ln -s hardware-relays.js hardware.js}
 \linebreak
-The last steps is to install all necessary Node.js modules using the npm tool. This tool must be run from the same directory where the Sprinkler software was installed. The typical list of necessary modules is: express, body-parse, graceful-fs,  moment-timezone,  nedb,  node-syslog and onoff. For example:
+The last steps is to install all necessary Node.js modules using the npm tool. This tool must be run from the same directory where the Sprinkler software was installed. The typical list of necessary modules is: express, body-parser, serve-static, graceful-fs,  moment-timezone,  nedb,  node-syslog and onoff. For example:
 
-\indent\texttt{npm install express body-parse graceful-fs}
+\indent\texttt{npm install express body-parser serve-static graceful-fs}
 \linebreak
 \indent\texttt{npm install moment-timezone nedb node-syslog onoff}
 \linebreak
