@@ -5,7 +5,7 @@ var moment = require('moment-timezone');
 
 var express = require('express');
 var bodyParser = require('body-parser');
-var staticpages = require('serve-static');
+var staticPages = require('serve-static');
 
 var path = require('./path');
 var event = require('./event');
@@ -156,8 +156,9 @@ process.on('uncaughtException', function(err) {
 // CONFIGURE THE WEBSERVER
 //////////////////////////////////////
 var app = express();
-app.use(staticpages(__dirname+'/public'));
-app.use(bodyParser());
+app.use(staticPages(__dirname+'/public'));
+app.use(bodyParser.json()); // Used when posting an edited config.
+
 
 // Routes
 
