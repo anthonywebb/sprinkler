@@ -94,7 +94,7 @@ On the solenoid wiring side, a relay typically provides 3 connections: a common 
 \subsection{General}
 The Spinkler software depends on the following software:
 \begin{description}
-\item[Node.js, version 0.10.2 or higher] \emph{Required}. The npm tool is required as well, as it is needed to install the node modules dependencies. Versions 0.9 or less of Node.js will not work, because these are no longer able to install required modules like express.
+\item[Node.js] \emph{Required}. Must be version 0.10.2 or higher. The npm tool is required as well, as it is needed to install the node modules dependencies. Versions 0.9 or less of Node.js will not work, because these are no longer able to install required modules like express.
 \item[git] \emph{Required}. As the Sprinkler software currently stands, git is the current installation method described in this document. This will be improved some day.
 \item[express] \emph{Required}. Installed through npm. This module provide a complete library for rapid web server development. Express \emph{can} be version 3 or 4 (or higher, if compatible).
 \item[body-parser] \emph{Required}. Installed through npm. This module provides a plugin for Express that parses a http body. (This module is integrated in express 3, but is a separate module starting with express 4. Using the separate module seems to work well with express 3 as well.)
@@ -171,7 +171,10 @@ This section is not about setting your watering programs. We are not there yet. 
 \item SPRINKLER\_HOME: the path of the directory where the Sprinkler software was installed.
 \end{description}
 The Sprinkler init script comes with some defaults but, at a minimum, the NODE\_JS\_HOME environment variable must be defined: the actual default in the init script calls for a specific (non-standard) location and version.
-\item Enable the init script. On Debian this is done using the command \texttt{insserv}.
+\item Enable the init script. On Debian this is done using the command \texttt{update-rc.d}, typically as:
+
+\indent\texttt{update-rc.d sprinkler defaults}
+\linebreak
 \end{description}
 \chapter{Using the System}
 \section{Navigating the Web Interface}

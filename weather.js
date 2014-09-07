@@ -393,7 +393,7 @@ function humidity () {
    if (weatherConditions) {
       max = +weatherConditions.history.dailysummary[0].maxhumidity;
       min = +weatherConditions.history.dailysummary[0].minhumidity;
-      return (max + min ) / 2;;
+      return Math.floor((max + min ) / 2);
    }
    return null;
 }
@@ -427,7 +427,8 @@ function pressure () {
    if (weatherConditions) {
       var summary = weatherConditions.history.dailysummary[0];
       if (summary.meanpressurei === undefined) {
-         return ((+summary.minpressurei) + (+summary.maxpressurei)) / 2;
+         // Calculate mean with 2 decimal digit precision.
+         return Math.floor(100*((+summary.minpressurei) + (+summary.maxpressurei)) / 2) / 100;
       }
       return +summary.meanpressurei;
    }
@@ -439,7 +440,7 @@ function dewpoint () {
    if (weatherConditions) {
       var summary = weatherConditions.history.dailysummary[0];
       if (summary.meandewpti === undefined) {
-         return ((+summary.mindewpti) + (+summary.maxdewpti)) / 2;
+         return Math.floor(((+summary.mindewpti) + (+summary.maxdewpti)) / 2);
       }
       return +weatherConditions.history.dailysummary[0].meandewpti;
    }
