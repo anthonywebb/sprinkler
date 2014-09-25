@@ -30,9 +30,12 @@ SPRINKLER_HOME=/home/pi/sprinkler
 PATH=/sbin:/usr/sbin:/bin:/usr/bin:$NODE_JS_HOME/bin
 DAEMON=$NODE_JS_HOME/bin/node
 DAEMON_ARGS="$SPRINKLER_HOME/server.js"
+RESET_ARGS="$SPRINKLER_HOME/reset.js"
 
 # Exit if the package is not installed
 [ -x "$DAEMON" ] || exit 0
+[ -r "$DAEMON_ARGS" ] || exit 0
+[ -r "$RESET_ARGS" ] || exit 0
 
 # Load the VERBOSE setting and other rcS variables
 . /lib/init/vars.sh
@@ -78,23 +81,14 @@ do_stop()
 	#   other if a failure occurred
 	start-stop-daemon --stop --quiet --retry=TERM/30/KILL/5 --pidfile $PIDFILE
 	RETVAL="$?"
+
+	# Reset all zones now, no matter what.
+	(cd /var/lib/sprinkler ; $DAEMON $RESET_ARGS 2>>/var/lib/sprinkler/errors >>/var/lib/sprinkler/stdout)
+
 	[ "$RETVAL" = 2 ] && return 2
 	# Many daemons don't delete their pidfiles when they exit.
 	rm -f $PIDFILE
 	return "$RETVAL"
-}
-
-#
-# Function that sends a SIGHUP to the daemon/service
-#
-do_reload() {
-	#
-	# If the daemon can reload its configuration without
-	# restarting (for example, when it is sent a SIGHUP),
-	# then implement that here.
-	#
-	start-stop-daemon --stop --signal 1 --quiet --pidfile $PIDFILE --name $NAME
-	return 0
 }
 
 case "$1" in
@@ -117,15 +111,6 @@ case "$1" in
   status)
 	status_of_proc "$DAEMON" "$NAME" && exit 0 || exit $?
 	;;
-  #reload|force-reload)
-	#
-	# If do_reload() is not implemented then leave this commented out
-	# and leave 'force-reload' as an alias for 'restart'.
-	#
-	#log_daemon_msg "Reloading $DESC" "$NAME"
-	#do_reload
-	#log_end_msg $?
-	#;;
   restart|force-reload)
 	#
 	# If the "reload" option is implemented then remove the

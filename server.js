@@ -1,8 +1,11 @@
 var os = require('os');
 var fs = require('graceful-fs');
 var dgram = require('dgram');
-var express = require('express');
 var moment = require('moment-timezone');
+
+var express = require('express');
+var bodyParser = require('body-parser');
+var staticPages = require('serve-static');
 
 var path = require('./path');
 var event = require('./event');
@@ -134,16 +137,28 @@ if (!config.wateringindex) {
     config.wateringindex.enable = false;
 }
 
+// Now that the configuration is available, quickly declare
+// a system exception catch-all, so that we can set all zones off
+// before the software exits.
+//
+process.on('uncaughtException', function(err) {
+    errorLog('Caught exception: ' + err.stack);
+    zonesOff()
+    event.record({action: 'END'});
+    setTimeout(function(){process.exit(1)}, 1000);
+});
+
+// For testing purpose only, do not uncomment otherwise!
+//
+//setTimeout(function(){ thisdoesnotexist(); }, 3000);
 
 ///////////////////////////////////////
 // CONFIGURE THE WEBSERVER
 //////////////////////////////////////
 var app = express();
-app.use(express.favicon());
-app.use(express.bodyParser());
-app.use(app.router);
-app.use(express.static(__dirname+'/public'));
-app.use(missingHandler);
+app.use(staticPages(__dirname+'/public'));
+app.use(bodyParser.json()); // Used when posting an edited config.
+
 
 // Routes
 
@@ -163,6 +178,10 @@ app.get('/onoff', function(req, res){
 
 app.get('/config', function(req, res){
     res.json(config);
+});
+
+app.get('/config/zones', function(req, res){
+    res.json(config.zones);
 });
 
 app.post('/config', function(req, res){
@@ -399,7 +418,20 @@ app.get('/calendar/programs', function(req, res){
 
 app.get('/weather', function(req, res){
     if (weather.status()) {
-        res.json({status:'ok',hostname:os.hostname(),temperature:weather.temperature(),high:weather.high(),low:weather.low(),humidity:weather.humidity(),rain:weather.rain(),rainsensor:weather.rainsensor(),adjustment:weather.adjustment()});
+        res.json({
+           status:'ok',
+           hostname:os.hostname(),
+           temperature:weather.temperature(),
+           high:weather.high(),
+           low:weather.low(),
+           humidity:weather.humidity(),
+           rain:weather.rain(),
+           rainsensor:weather.rainsensor(),
+           windspeed:weather.windspeed(),
+           winddirection:weather.winddirection(),
+           pressure:weather.pressure(),
+           dewpoint:weather.dewpoint(),
+           adjustment:weather.adjustment()});
     } else {
         res.json({status:'ok'});    
     }
@@ -408,6 +440,15 @@ app.get('/weather', function(req, res){
 app.get('/hardware/info', function(req, res){
     res.json(hardware.info());
 });
+
+
+// End of chain: if the URL requested matches nothing, return an error.
+//
+app.use(function (req, res, next) {
+    errorLog('404 Not found - '+req.url);
+    res.json(404, { status: 'error', msg: 'Not found, sorry...' });
+});
+
 
 ///////////////////////////////////////
 // SCHEDULER
@@ -424,12 +465,14 @@ function scheduleOneProgram (program, now) {
    if (program.until) {
       if (program.until.isBefore(now)) return false;
    }
+   debugLog ('Exact time of day for program '+program.name);
 
    // Eliminate occurrences that have been excluded (either modified and
    // replaced by an exception, or deleted).
    if (program.exclusions) {
       for (var j = 0; j < program.exclusions.length; j++) {
          if (Math.abs(now.diff(program.exclusions[j])) < 60000) {
+            debugLog ('Program '+program.name+' is excluded today');
             return false; // This occurrence was excluded.
          }
       }
@@ -439,8 +482,8 @@ function scheduleOneProgram (program, now) {
    if (program.date) {
       var date = moment(program.date+' '+program.start, 'YYYYMMDD HH:mm');
       var delta = now.diff(date, 'days');
-      if (delta < 0) return false; // Starts at a future date.
       debugLog ('delta from '+date.format()+' to '+now.format()+' is '+delta);
+      if (delta < 0) return false; // Starts at a future date.
    } else {
       // No start date yet: force the program to start today.
       program.date = now.format('YYYYMMDD');
@@ -605,7 +648,7 @@ setInterval(function(){
     wateringindex.refresh();
     var update = weather.updated();
     if (weather.status() && (update > lastWeatherUpdateRecorded)) {
-        event.record({action: 'UPDATE', source:'WEATHER', temperature: weather.temperature(), humidity: weather.humidity(), rain: weather.rain(), adjustment: weather.adjustment()});
+        event.record({action: 'UPDATE', source:'WEATHER', temperature: weather.temperature(), windspeed: weather.windspeed(), humidity: weather.humidity(), rain: weather.rain(), adjustment: weather.adjustment()});
         lastWeatherUpdateRecorded = update;
     }
     update = wateringindex.updated();
@@ -645,11 +688,6 @@ event.record({action: 'STARTUP'});
 ///////////////////////////////////////
 // HELPERS
 //////////////////////////////////////
-
-function missingHandler(req, res, next) {
-    errorLog('404 Not found - '+req.url);
-    res.json(404, { status: 'error', msg: 'Not found, sorry...' });
-}
 
 function errorHandler(res, msg) {
     errorLog(msg);
@@ -829,6 +867,7 @@ function programOn(program) {
         logentry.source = wateringindex.source();
     } else if (weather.status()) {
         logentry.temperature = weather.temperature();
+        logentry.windspeed = weather.windspeed();
         logentry.humidity = weather.humidity();
         logentry.rain = weather.rain();
         logentry.adjustment = weather.adjustment();
@@ -843,9 +882,18 @@ function programOn(program) {
 function zoneMaster (index, on) {
     if (config.zones[index].master !== undefined) {
        var master = config.zones[index].master;
-       if ((master >= 0) && (master < zonecount)) {
-          hardware.setZone (master, on);
-          hardware.apply();
+       if ((master != index) && (master >= 0) && (master < zonecount)) {
+          if (on) {
+             // Open this master before its own master, if any
+             hardware.setZone (master, true);
+             hardware.apply();
+             zoneMaster (master, true);
+          } else {
+             // Close this master after its own master, if any.
+             zoneMaster (master, false);
+             hardware.setZone (master, false);
+             hardware.apply();
+          }
        }
     }
 }

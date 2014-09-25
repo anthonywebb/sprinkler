@@ -1,5 +1,5 @@
 @import url(http://fonts.googleapis.com/css?family=Metrophobic);
-@import url(http://fonts.googleapis.com/css?family=Iceland);
+@import url(http://fonts.googleapis.com/css?family=Delius);
 
 .sprkrpanel {
    float: left;
@@ -59,8 +59,7 @@
    text-align: left;
 }
 .sprkrdata {
-   font-family: 'Iceland', sans-serif;
-   font-weight: bold;
+   font-family: 'Delius', sans-serif;
    font-size: 20px;
    color: white;
 }

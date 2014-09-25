@@ -44,6 +44,9 @@ function saveConfig () {
    newconfig.weather = new Object();
    newconfig.weather.enable = form.weather.weatherenable.checked;
    newconfig.weather.key = form.weather.weatherkey.value;
+   if (form.weather.weatherstation.value) {
+      newconfig.weather.station = form.weather.weatherstation.value;
+   }
    newconfig.weather.raintrigger = form.weather.weatherrain.value;
    newconfig.weather.adjust = new Object();
    newconfig.weather.adjust.enable = form.weather.weatheradjustenable.checked;
@@ -82,6 +85,7 @@ function saveConfig () {
       newconfig.zones[i].name = form.zones[prefix+'name'].value;
       if (hardware.zones.pin) {
          newconfig.zones[i].pin = form.zones[prefix+'pin'].value;
+         newconfig.zones[i].on = form.zones[prefix+'level'].value;
       }
       if (form.zones[prefix+'adjust'].value) {
          newconfig.zones[i].adjust = form.zones[prefix+'adjust'].value;
@@ -277,6 +281,24 @@ function showOneZone (zones, i, elements) {
          pininput.placeholder = 'GPIO pin';
          pincolumn.appendChild(pininput);
          outer.appendChild(pincolumn);
+
+         var levelcolumn = document.createElement("td");
+         var levelselect = document.createElement("select");
+         levelselect.name = prefix+'level';
+         levelcolumn.appendChild(levelselect);
+         outer.appendChild(levelcolumn);
+         var levelhigh = document.createElement("option");
+         levelhigh.value = 'HIGH';
+         levelhigh.innerHTML = 'Active High';
+         levelselect.appendChild(levelhigh);
+         levellow = document.createElement("option");
+         levellow.value = 'LOW';
+         levellow.innerHTML = 'Active Low';
+         levelselect.appendChild(levellow);
+         if (zones[i].on === 'HIGH')
+            levelhigh.selected = true;
+         else
+            levellow.selected = true;
       }
 
       var adjustcolumn = document.createElement("td");
@@ -833,6 +855,10 @@ window.onload = function() {
             titlecolumn = document.createElement("th");
             titlecolumn.innerHTML = 'GPIO';
             titleline.appendChild(titlecolumn);
+
+            titlecolumn = document.createElement("th");
+            titlecolumn.innerHTML = 'Level';
+            titleline.appendChild(titlecolumn);
          }
          titlecolumn = document.createElement("th");
          titlecolumn.innerHTML = 'Adjustment';
@@ -954,6 +980,11 @@ window.onload = function() {
                showInput ("weathersens", config.weather.adjust.sensitivity);
             }
             showInput ("weatherkey", config.weather.key);
+            if (config.weather.station) {
+               showInput ("weatherstation", config.weather.station);
+            } else {
+               showInput ("weatherstation", "");
+            }
             showInput ("weatherrain", config.weather.raintrigger);
          }
          if (config.wateringindex) {
@@ -1124,6 +1155,10 @@ window.onload = function() {
         <tr>
            <td></td>
            <td><input type="checkbox" name="weatherenable"> Query weather conditions</td>
+        </tr>
+        <tr>
+           <td>Station:</td>
+           <td><input type="text" size="16" name="weatherstation" placeholder="Station ID"></td>
         </tr>
         <tr>
            <td>Key:</td>

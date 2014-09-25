@@ -37,6 +37,10 @@
 //
 //      This function retrieves the user configuration.
 //
+//   sprinklerConfigZones(callback);
+//
+//      This function retrieves the watering zones configuration.
+//
 //   sprinklerSaveConfig(config);
 //
 //      This function sends the user configuration to the server. The
@@ -164,7 +168,11 @@ function sprinklerUpdate () {
                sprinklerSetContent ('temperature', ''+response.temperature+' F');
                sprinklerSetContent ('maxtemp', ''+response.high+' F');
                sprinklerSetContent ('mintemp', ''+response.low+' F');
+               sprinklerSetContent ('pressure', ''+response.pressure+' in');
+               sprinklerSetContent ('windspeed', ''+response.windspeed+' mph');
+               sprinklerSetContent ('winddirection', response.winddirection);
                sprinklerSetContent ('humidity', ''+response.humidity+'%');
+               sprinklerSetContent ('dewpoint', ''+response.dewpoint+' F');
                sprinklerSetContent ('rain', ''+response.rain+' in');
                sprinklerSetContent ('rainsensor', response.rainsensor?'SENSOR ON':'SENSOR OFF');
             }
@@ -199,6 +207,19 @@ function sprinklerInfo () {
 function sprinklerConfig (callback) {
    var command = new XMLHttpRequest();
    command.open("GET", "/config");
+   command.onreadystatechange = function () {
+      if (command.readyState === 4 && command.status === 200) {
+         var config = JSON.parse(command.responseText);
+         // var type = command.getResponseHeader("Content-Type");
+         callback(config);
+      }
+   }
+   command.send(null);
+}
+
+function sprinklerConfigZones(callback) {
+   var command = new XMLHttpRequest();
+   command.open("GET", "/config/zones");
    command.onreadystatechange = function () {
       if (command.readyState === 4 && command.status === 200) {
          var config = JSON.parse(command.responseText);

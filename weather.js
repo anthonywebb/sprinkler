@@ -72,6 +72,22 @@
 //
 //      return the total rain level for the last two days in inches.
 //
+//   weather.windspeed ();
+//
+//      return the average wind speed for the previous day.
+//
+//   weather.winddirection ();
+//
+//      return the wind direction for the previous day.
+//
+//   weather.pressure ();
+//
+//      return the average air pressure for the previous day.
+//
+//   weather.gust ();
+//
+//      return the maximum wind speed for the previous day.
+//
 //   weather.rainsensor ();
 //
 //      return true if the current rain has reached the configured
@@ -88,10 +104,13 @@
 //
 // CONFIGURATION
 //
-//   zipcode             The local USPS zipcode.
+//   zipcode             The local USPS zipcode, used if no weather station
+//                       was specified.
 //
 //   weather             The weather module configuration object.
 //                       If missing, the weather module is disabled.
+//
+//   weather.station     A specific weather station to query from.
 //
 //   weather.refresh     When to refresh weather information. This is
 //                       an array of times of day (hour[:min]). One cannot
@@ -129,7 +148,6 @@ var refreshSchedule = new Array();;
 var url = null;
 var enable = false;
 var raintrigger = null;
-var webRequest = null;
 
 var adjustParameters = new Object();
 
@@ -137,6 +155,10 @@ var debugLog = function (text) {}
 
 function verboseLog (text) {
    console.log ('[DEBUG] Weather: '+text);
+}
+
+function errorLog (text) {
+   console.log ('[ERROR] Weather: '+text);
 }
 
 function restoreDefaults () {
@@ -171,9 +193,16 @@ exports.configure = function (config, options) {
       return;
    }
 
-   url = 'http://api.wunderground.com/api/'
-                + config.weather.key + '/yesterday/conditions/q/'
-                + config.zipcode + '.json';
+   if (config.weather.station) {
+      url = 'http://api.wunderground.com/api/'
+                   + config.weather.key + '/yesterday/conditions/q/'
+                   + 'pws:' + config.weather.station + '.json';
+   } else {
+      url = 'http://api.wunderground.com/api/'
+                   + config.weather.key + '/yesterday/conditions/q/'
+                   + config.zipcode + '.json';
+   }
+   debugLog('URL used is '+url);
 
    if (config.weather.refresh) {
       for (var i = 0; i < config.weather.refresh.length; i++) {
@@ -272,20 +301,39 @@ function getWeatherNow () {
    debugLog ('checking for update..');
    received = "";
 
-   webRequest = http.request(url, function(res) {
+   var webRequest = http.request(url, function(res) {
       res.on('data', function(d) {
          received = received + d.toString();
       });
       res.on('end', function(d) {
-         weatherConditions = JSON.parse(received);
+         var newreport = null;
+         try {
+            newreport = JSON.parse(received);
+         }
+         catch (err) {
+            if (received.search (/<TITLE>Service Unavailable<\/TITLE>/) > 0) {
+               errorLog('service unavailable');
+            } else {
+               errorLog('received invalid data = '+received);
+            }
+            received = null;
+            return;
+         }
+         if ((newreport.history === undefined) ||
+             (newreport.history.dailysummary === undefined) ||
+             (newreport.current_observation === undefined)) {
+            errorLog ('invalid response from '+url+': '+received);
+         } else {
+            weatherConditions = newreport;
+            weatherConditions.updated = new Date();
+            debugLog ('received update');
+         }
          received = null;
-         weatherConditions.updated = new Date();
-         debugLog ('received update');
       });
    });
    webRequest.on('error', function(e) {
       received = null;
-      weatherConditions = null;
+      errorLog ('error response from '+url+': '+e);
    });
    webRequest.end();
    webRequest = null;
@@ -321,7 +369,7 @@ exports.enabled = function () {
 
 function temperature () {
    if (weatherConditions) {
-      return weatherConditions.history.dailysummary[0].meantempi - 0;
+      return +weatherConditions.history.dailysummary[0].meantempi;
    }
    return null;
 }
@@ -329,32 +377,81 @@ exports.temperature = temperature;
 
 exports.high = function () {
    if (weatherConditions) {
-      return weatherConditions.history.dailysummary[0].maxtempi - 0;
+      return +weatherConditions.history.dailysummary[0].maxtempi;
    }
    return null;
 }
 
 exports.low = function () {
    if (weatherConditions) {
-      return weatherConditions.history.dailysummary[0].mintempi - 0;
+      return +weatherConditions.history.dailysummary[0].mintempi;
    }
    return null;
 }
 
 function humidity () {
    if (weatherConditions) {
-      max = weatherConditions.history.dailysummary[0].maxhumidity - 0;
-      min = weatherConditions.history.dailysummary[0].minhumidity - 0;
-      return (max + min ) / 2;;
+      max = +weatherConditions.history.dailysummary[0].maxhumidity;
+      min = +weatherConditions.history.dailysummary[0].minhumidity;
+      return Math.floor((max + min ) / 2);
    }
    return null;
 }
 exports.humidity = humidity;
 
+function windspeed () {
+   if (weatherConditions) {
+      return +weatherConditions.history.dailysummary[0].meanwindspdi;
+   }
+   return null;
+}
+exports.windspeed = windspeed;
+
+function gust () {
+   if (weatherConditions) {
+      return +weatherConditions.history.dailysummary[0].maxwspdi;
+   }
+   return null;
+}
+exports.gust = gust;
+
+function winddirection () {
+   if (weatherConditions) {
+      return weatherConditions.history.dailysummary[0].meanwdire;
+   }
+   return null;
+}
+exports.winddirection = winddirection;
+
+function pressure () {
+   if (weatherConditions) {
+      var summary = weatherConditions.history.dailysummary[0];
+      if (summary.meanpressurei === undefined) {
+         // Calculate mean with 2 decimal digit precision.
+         return Math.floor(100*((+summary.minpressurei) + (+summary.maxpressurei)) / 2) / 100;
+      }
+      return +summary.meanpressurei;
+   }
+   return null;
+}
+exports.pressure = pressure;
+
+function dewpoint () {
+   if (weatherConditions) {
+      var summary = weatherConditions.history.dailysummary[0];
+      if (summary.meandewpti === undefined) {
+         return Math.floor(((+summary.mindewpti) + (+summary.maxdewpti)) / 2);
+      }
+      return +weatherConditions.history.dailysummary[0].meandewpti;
+   }
+   return null;
+}
+exports.dewpoint = dewpoint;
+
 function rain () {
    if (weatherConditions) {
-      var precipi = weatherConditions.history.dailysummary[0].precipi - 0;
-      var today = weatherConditions.current_observation.precip_today_in - 0;
+      var precipi = +weatherConditions.history.dailysummary[0].precipi;
+      var today = +weatherConditions.current_observation.precip_today_in;
       return precipi + today;
    }
    return null;
@@ -364,7 +461,7 @@ exports.rain = rain;
 exports.rainsensor = function () {
    if (raintrigger == null) return false;
    if (weatherConditions == null) return false;
-   var today_in = weatherConditions.current_observation.precip_today_in - 0;
+   var today_in = +weatherConditions.current_observation.precip_today_in;
    return (today_in >= raintrigger);
 }
 
